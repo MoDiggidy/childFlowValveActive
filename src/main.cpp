@@ -1,5 +1,5 @@
 
-#include "wifiComs.h"
+#include <wifiComs.h>
 #include "espNow.h"
 #include "flowMon.h"
 
@@ -13,9 +13,9 @@ void setup()
 {
   Serial.begin(115200);
   delay(3000);
+  startNeoPixel();
   connectToWiFi();
   initESPNow();
-  startNeoPixel();
 
   flowMeterSetup();
   // Initialize NTP client and force sync
