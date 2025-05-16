@@ -26,14 +26,14 @@ struct ParentPayload {
 
 struct fullFlowPayload {
   float max10s_fl, max1m_fl, max10m_fl, total_fl;
-  int max10s_T_M, max1m_T_M, max10m_T_M;
-  int dayStamp, minutesStamp;
+  int max10sTimeStamp, max1mTimeStamp, max10mTimeStamp;
+  int timeStamp;
   int valveStatusDom, valveModeDom;
 };
 
 struct SimpleFlowPayload {
   float flow10s, flow30s;
-  int valveStatus, runTime, valveMode, warning;
+  int valveStatus, runTime, valveMode, warning, timeStamp;
 };
 
 volatile bool sendSuccess = false;
