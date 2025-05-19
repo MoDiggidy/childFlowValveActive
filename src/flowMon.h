@@ -7,10 +7,10 @@
 #define FLOW_SENSOR_PIN 27 // Replace with your flowmeter pin
 
 // === Configuration Constants ===
-const int sendFlowTimeMs = 10000;  //rate at which simpleflow data gets sent 
-const int updateFlowTimeMs = 10000;  // cycle time to check pulse count on flowmeter
-const float calibrationFactor = 10.0; // pulses per gallon
-const unsigned long waterRunMinSec = 15;  //how long flow stops before updateing flow to stopped
+const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
+const int updateFlowTimeMs = 10000;      // cycle time to check pulse count on flowmeter
+const float calibrationFactor = 10.0;    // pulses per gallon
+const unsigned long waterRunMinSec = 15; // how long flow stops before updateing flow to stopped
 const int waterRunMaxSec[3] = {0, 60, 30};
 const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
@@ -321,9 +321,12 @@ void loadVolumeFromPrefs()
     volumeHour = volumePrefs.getFloat("volHour", 0.0);
     volumeMin = volumePrefs.getFloat("volMin", 0.0);
     volumeDay = volumePrefs.getFloat("volDay", 0.0);
+    oldHour = getInt("oldHour", oldHour);
+    oldDay = getInt("oldDay", oldDay);
     volumePrefs.end();
 
-    Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f\n", volumeHour, volumeMin, volumeDay);
+    Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
+                  volumeHour, volumeMin, volumeDay, oldHour, oldDay);
 }
 
 void saveVolumeToPrefs()
@@ -332,6 +335,9 @@ void saveVolumeToPrefs()
     volumePrefs.putFloat("volHour", volumeHour);
     volumePrefs.putFloat("volMin", volumeMin);
     volumePrefs.putFloat("volDay", volumeDay);
+    volumePrefs.putInt("oldHour", oldHour);
+    volumePrefs.putInt("oldDay", oldDay);
+
     volumePrefs.end();
 
     Serial.println("Saved volume values to preferences.");
