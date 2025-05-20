@@ -14,7 +14,7 @@ int statusProperty = 1;
 // Timer Setup
 ////////////
 unsigned long timerCheckMs;        // establish variable to check timer loop
-unsigned long timerTimeMs = 60000; // set timer loop  to 15 seconds
+unsigned long timerTimeMs = 30000; // set timer loop  to 15 seconds
 #define WDT_TIMEOUT 300       //  watchdog loop timer seconds
 
 void setup()
@@ -36,6 +36,9 @@ void setup()
   ///mqtt setup
   mqttClient.setServer(mqtt_server, 1883);
   mqttClient.setKeepAlive(CUSTOM_MQTT_KEEPALIVE);
+  connectToMQTT();
+
+  valveRelaySetup();
 
 }
 
@@ -57,5 +60,6 @@ void loop()
   {
     timerCheckMs = millis();
 
+  connectToMQTT();
   }
 }

@@ -15,7 +15,8 @@ const int waterRunMaxSec[3] = {0, 60, 30};
 const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000 // Max cycle time in ms (e.g. 10 seconds)
-#define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening (5 seconds)
+#define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening 
+#define VALVE_RELAY 33            // Valve Relay Pin
 
 // === Global Flow Variables ===
 bool waterRun = false;
@@ -56,7 +57,7 @@ float max1Min = 0, max10Sec = 0, max10Min = 0, max30Min = 0;
 String max1MinTime = "", max10SecTime = "", max10MinTime = "", max30MinTime = "";
 
 // === External Valve/State Flags ===
-extern bool valveStatus;
+extern bool valveClosed;
 extern int statusMonitor;
 
 // declaire functions early
@@ -82,6 +83,11 @@ void flowMeterSetup()
 
     Serial.printf("Current Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
     loadVolumeFromPrefs(); // load values if lost on reset
+}
+
+void valveRelaySetup()
+{
+    pinMode(VALVE_RELAY, OUTPUT); // Set the Valve Relay pin as output
 }
 
 void resetMaxValues()
@@ -130,7 +136,7 @@ void sendflow(String oldTimeStamp, int volumeSend)
         max10Sec, max1Min, max10Min, volumeSend,
         max10SecTime, max1MinTime, max10MinTime,
         oldTimeStamp,
-        valveStatus, statusMonitor);
+        valveClosed, statusMonitor);
 }
 
 // === FlowCalc Helpers ===
@@ -170,6 +176,7 @@ void updateWaterState(long pulseCountNow, float volumeNowgal)
         {
             waterRunDurSec = 0;
             waterRun = false;
+            waterStopDurSec += deltaSec;
         }
         else
         {
@@ -181,19 +188,21 @@ void updateWaterState(long pulseCountNow, float volumeNowgal)
 
 void closeValve()
 {
+    digitalWrite(VALVE_RELAY, HIGH); // Close Valve
     Serial.println("===========================");
     Serial.println("!!!!!!!!SHUT OFF WATER!!!!!");
     Serial.println("===========================");
-    valveStatus = true;
+    valveClosed = true;
     sendSimpleFlowData(1);
 }
 
 void openValve()
 {
+    digitalWrite(VALVE_RELAY, LOW); // Open Valve
     Serial.println("===========================");
     Serial.println("Valve is now OPEN");
     Serial.println("===========================");
-    valveStatus = false;
+    valveClosed = false;
     sendSimpleFlowData(0);
 }
 
@@ -233,7 +242,7 @@ void handleValveLogic()
     if (statusMonitor < 0 || statusMonitor > 2)
         statusMonitor = 1; // default to safe value Home
 
-    if (!valveStatus && statusMonitor != 0 && waterRunDurSec > waterRunMaxSec[statusMonitor])
+    if (!valveClosed && statusMonitor != 0 && waterRunDurSec > waterRunMaxSec[statusMonitor])
     {
         closeValve();
     }
@@ -287,8 +296,8 @@ void logFlowStatus(long pulseCountNow, float volumeNowgal)
     Serial.println();
     Serial.printf("Pulse Count: %ld\n", pulseCountNow);
     Serial.printf("Flow update --> 10secvol: %.2f || 10secflow: %.2f || 30secFlow: %.2f\n", volumeNowgal, flow10s, flowAvgValue);
-    Serial.printf("VolumeHour: %.2f || running: %d || Running Time: %lu || Stop Time: %lu || valveStatus: %d\n || waterRunMaxSec: %d\n",
-                  volumeHour, waterRun, waterRunDurSec, waterStopDurSec, valveStatus, waterRunMaxSec[statusMonitor]);
+    Serial.printf("VolumeHour: %.2f || running: %d || Running Time: %lu || Stop Time: %lu || valveClosed: %d\n || waterRunMaxSec: %d\n",
+                  volumeHour, waterRun, waterRunDurSec, waterStopDurSec, valveClosed, waterRunMaxSec[statusMonitor]);
 }
 
 void flowCalcs()
@@ -321,8 +330,8 @@ void loadVolumeFromPrefs()
     volumeHour = volumePrefs.getFloat("volHour", 0.0);
     volumeMin = volumePrefs.getFloat("volMin", 0.0);
     volumeDay = volumePrefs.getFloat("volDay", 0.0);
-    oldHour = getInt("oldHour", oldHour);
-    oldDay = getInt("oldDay", oldDay);
+    oldHour = volumePrefs.getInt("oldHour", oldHour);
+    oldDay = volumePrefs.getInt("oldDay", oldDay);
     volumePrefs.end();
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",

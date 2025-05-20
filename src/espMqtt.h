@@ -20,6 +20,10 @@ const char *mqtt_lwt_topic = "6556/water/domestic/domesticSupplyFlow/status";
 const char *mqtt_lwt_message = "offline";
 const char *mqtt_online_message = "online";
 
+const char *mqtt_command_topic = "6556/water/domestic/domesticSupplyFlow/cmdSend";
+const char *mqtt_ack_topic = "6556/water/domestic/domesticSupplyFlow/cmdAck";
+
+
 #define RETRY_INTERVAL 60000UL // 1 min
 #define BUFFER_SIZE 24         // up to 24 hours of data
 #define CUSTOM_MQTT_KEEPALIVE 60
@@ -66,7 +70,7 @@ void sendAck(const char *cmd, const char *status)
 
     char response[128];
     serializeJson(ack, response);
-    mqttClient.publish("6556/water/domestic/domesticSupplyFlow/ack", response, true);
+    mqttClient.publish(mqtt_ack_topic, response, true);
     Serial.printf("Acknowledgment sent: %s\n", response);
 }
 
@@ -78,7 +82,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 
     Serial.printf("Message received on topic %s: %s\n", topic, msg.c_str());
 
-    if (String(topic) == "6556/water/domestic/domesticSupplyFlow/commands")
+    if (String(topic) == mqtt_command_topic)
     {
         StaticJsonDocument<128> doc;
         DeserializationError error = deserializeJson(doc, msg);
@@ -154,6 +158,8 @@ void connectToMQTT()
                 mqtt_lwt_message)) // Last Will message
         {
             mqttClient.publish(mqtt_lwt_topic, mqtt_online_message, true); // Publish online status
+    mqttClient.setCallback(mqttCallback);
+    mqttClient.subscribe(mqtt_command_topic);
             Serial.println(" connected.");
             return;
         }
@@ -171,8 +177,6 @@ void connectToMQTT()
         }
     }
 
-    mqttClient.setCallback(mqttCallback);
-    mqttClient.subscribe("6556/water/domestic/domesticSupplyFlow/commands");
 }
 
 bool sendMQTTMessage(const char *payload)
