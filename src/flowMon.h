@@ -253,9 +253,7 @@ void handleTimedEvents()
     if (oldMin != getMinute())
     {
         Serial.println("<<<>>> NEW Minute");
-        sendflow(oldTimeStamp, volumeHour);
         volumeMin = 0;
-        oldTimeStamp = getDateTimeMin();
         oldMin = getMinute();
         volumeNeedsSave = true;
     }
@@ -263,6 +261,8 @@ void handleTimedEvents()
     if (oldHour != getHour())
     {
         Serial.printf("\n<<<>>> NEW Hour:: Day Volume: %.2f\n\n", volumeHour);
+        sendflow(oldTimeStamp, volumeHour);
+        oldTimeStamp = getDateTimeMin();
         volumeHour = 0;
         oldHour = getHour();
         volumeNeedsSave = true;
@@ -324,6 +324,7 @@ void flowCalcs()
     }
 }
 
+
 void loadVolumeFromPrefs()
 {
     volumePrefs.begin("flowvol", true); // read-only
@@ -332,6 +333,8 @@ void loadVolumeFromPrefs()
     volumeDay = volumePrefs.getFloat("volDay", 0.0);
     oldHour = volumePrefs.getInt("oldHour", oldHour);
     oldDay = volumePrefs.getInt("oldDay", oldDay);
+    oldTimeStamp = volumePrefs.getString("oldTimeStamp", "");
+    minuteStampsPrevious = volumePrefs.getString("minuteStampsPrevious", "");
     volumePrefs.end();
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
@@ -346,6 +349,8 @@ void saveVolumeToPrefs()
     volumePrefs.putFloat("volDay", volumeDay);
     volumePrefs.putInt("oldHour", oldHour);
     volumePrefs.putInt("oldDay", oldDay);
+    volumePrefs.putString("oldTimeStamp", oldTimeStamp);
+    volumePrefs.putString("minuteStampsPrevious", minuteStampsPrevious);
 
     volumePrefs.end();
 

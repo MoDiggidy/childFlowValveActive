@@ -34,7 +34,7 @@ bool isCyclingValve = false;
 
 extern float flow10s;
 extern float flowAvgValue;
-extern bool valveStatus;
+extern bool valveClosed;
 extern long unsigned int waterRunDurSec;
 extern int statusMonitor;
 
@@ -334,7 +334,7 @@ void sendSimpleFlowData(int warning)
 
     doc["flow10s"] = flow10s;
     doc["flow30s"] = flowAvgValue;
-    doc["valveStatus"] = valveStatus;
+    doc["valveClosed"] = valveClosed;
     doc["runTime"] = waterRunDurSec;
     doc["valveMode"] = statusMonitor;
     doc["warning"] = warning;

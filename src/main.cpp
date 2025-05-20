@@ -6,7 +6,7 @@
 //#include "espNow.h"
 
 /// Declare message variables
-bool valveStatus = false;
+bool valveClosed = false;
 int statusMonitor = 1;  // 0 manual : 1 Home : 2 Away
 int statusProperty = 1;
 
