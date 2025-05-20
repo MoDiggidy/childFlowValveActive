@@ -81,7 +81,7 @@ void flowMeterSetup()
     oldMin = getMinute();
     minuteStampsPrevious = getDateTimeMin();
 
-    Serial.printf("Current Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
+    Serial.printf("Old Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
     loadVolumeFromPrefs(); // load values if lost on reset
 }
 
@@ -203,6 +203,7 @@ void openValve()
     Serial.println("Valve is now OPEN");
     Serial.println("===========================");
     valveClosed = false;
+    waterRunDurSec = 0;
     sendSimpleFlowData(0);
 }
 
@@ -334,7 +335,8 @@ void loadVolumeFromPrefs()
     oldHour = volumePrefs.getInt("oldHour", oldHour);
     oldDay = volumePrefs.getInt("oldDay", oldDay);
     oldTimeStamp = volumePrefs.getString("oldTimeStamp", "");
-    minuteStampsPrevious = volumePrefs.getString("minuteStampsPrevious", "");
+    minuteStampsPrevious = volumePrefs.getString("minStP", "");
+    statusMonitor = volumePrefs.getInt("statusMonitor", statusMonitor);
     volumePrefs.end();
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
@@ -350,13 +352,38 @@ void saveVolumeToPrefs()
     volumePrefs.putInt("oldHour", oldHour);
     volumePrefs.putInt("oldDay", oldDay);
     volumePrefs.putString("oldTimeStamp", oldTimeStamp);
-    volumePrefs.putString("minuteStampsPrevious", minuteStampsPrevious);
+    volumePrefs.putString("minStP", minuteStampsPrevious);
+    volumePrefs.putInt("statusMonitor", statusMonitor);
 
     volumePrefs.end();
 
     Serial.println("Saved volume values to preferences.");
     volumeNeedsSave = false;
     lastVolumeSave = millis();
+}
+
+void setValveMode(int newMode)
+{
+    if(newMode != statusMonitor){
+        statusMonitor = newMode;
+        saveVolumeToPrefs();
+        Serial.print("Valve mode set to: ");
+        Serial.println(statusMonitor);
+
+        if(statusMonitor == 0){
+            showPixelColor(255, 255, 0);
+        }else if(statusMonitor == 1){
+            showPixelColor(0, 255, 255);
+        }else if(statusMonitor == 2){
+            showPixelColor(255, 0, 255);
+        }
+
+    }else{
+        Serial.print("Valve mode not updated, already set to: ");
+        Serial.println(statusMonitor);
+    }
+
+
 }
 
 #endif

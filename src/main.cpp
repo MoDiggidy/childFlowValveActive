@@ -25,11 +25,13 @@ void setup()
   esp_task_wdt_init(WDT_TIMEOUT, true);
   esp_task_wdt_add(NULL);
 
+  
+  flowMeterSetup();
+
   startNeoPixel();
   connectToWiFi();
   //initESPNow();
 
-  flowMeterSetup();
   // Initialize NTP client and force sync
   initTime();
   

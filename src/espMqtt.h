@@ -21,7 +21,7 @@ const char *mqtt_lwt_message = "offline";
 const char *mqtt_online_message = "online";
 
 const char *mqtt_command_topic = "6556/water/domestic/domesticSupplyFlow/cmdSend";
-const char *mqtt_ack_topic = "6556/water/domestic/domesticSupplyFlow/cmdAck";
+const char *mqtt_ack_topic = "6556/water/domestic/domesticSupplyFlow/Ack";
 
 
 #define RETRY_INTERVAL 60000UL // 1 min
@@ -42,7 +42,9 @@ extern int statusMonitor;
 extern void closeValve();
 extern void openValve();
 extern void cycleValve();
-void connectToWiFi();
+extern void saveVolumeToPrefs();
+extern void setValveMode(int newMode);
+extern void connectToWiFi();
 void connectToMQTT();
 bool sendMQTTMessage(const char *payload);
 void savePayloadToBuffer(const char *payload);
@@ -117,20 +119,17 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
         }
         else if (strcmp(cmd, "Status0") == 0)
         {
-            statusMonitor = 0;
-            Serial.printf("valve mode changed to Manual");
+            setValveMode(0);
             sendAck(cmd, "received");
         }
         else if (strcmp(cmd, "Status1") == 0)
         {
-            statusMonitor = 1;
-            Serial.printf("valve mode changed to Home");
+            setValveMode(1);
             sendAck(cmd, "received");
         }
         else if (strcmp(cmd, "Status2") == 0)
         {
-            statusMonitor = 2;
-            Serial.printf("valve mode changed to Away");
+            setValveMode(2);
             sendAck(cmd, "received");
         }
         else
