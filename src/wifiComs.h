@@ -10,19 +10,37 @@
 /////////////////////////////
 ///neopixel
 ////////////////////////////
-#define NEOPIXEL_PIN PIN_NEOPIXEL
-#define NEOPIXEL_COUNT 1
-Adafruit_NeoPixel pixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-void showPixelColor(uint8_t r, uint8_t g, uint8_t b) {
-  pixel.setPixelColor(0, pixel.Color(r, g, b));
-  pixel.show();
+#define NEOPIXELEX_PIN 14
+#define NEOPIXEL_COUNT 3
+
+#define NEOPIXEL_PIN PIN_NEOPIXEL
+
+
+
+Adafruit_NeoPixel pixelOnboard(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
+Adafruit_NeoPixel strip(NEOPIXEL_COUNT, NEOPIXELEX_PIN, NEO_GRB + NEO_KHZ800);
+
+void showPixelColorOnboard(uint8_t r, uint8_t g, uint8_t b) {
+  pixelOnboard.setPixelColor(0, pixelOnboard.Color(r, g, b));
+  pixelOnboard.show();
+}
+
+void showPixelColorEx(int ledNum,uint8_t r, uint8_t g, uint8_t b) {
+  strip.setPixelColor(ledNum, strip.Color(r, g, b));      // Red
+  strip.show();
 }
 
 void startNeoPixel() {
-  pixel.begin();
-  pixel.setBrightness(50);  // Optional brightness limit
-  showPixelColor(255, 0, 0); // Start with red
+  pixelOnboard.begin();
+  pixelOnboard.setBrightness(50);  // Optional brightness limit
+  strip.begin();
+  strip.setBrightness(50);  // Optional brightness limit
+  showPixelColorOnboard(255, 0, 0); // Start with red
+  showPixelColorEx(0,255, 0, 0); // Start with red
+  showPixelColorEx(1,255, 0, 0); // Start with red
+
 }
 
 
@@ -46,7 +64,7 @@ void connectToWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     
-    showPixelColor(0, 255, 0);  // Turn green on success
+    showPixelColorOnboard(0, 255, 0);  // Turn green on success
     Serial.println("WiFi Connected!");
     Serial.print("IP Address: "); Serial.println(WiFi.localIP());
     Serial.print("MAC Address: "); Serial.println(WiFi.macAddress());

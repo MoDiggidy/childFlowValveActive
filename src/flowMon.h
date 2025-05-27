@@ -194,6 +194,8 @@ void closeValve()
     Serial.println("===========================");
     valveClosed = true;
     sendSimpleFlowData(1);
+    
+  showPixelColorEx(1,255, 0, 0); // Start with red
 }
 
 void openValve()
@@ -205,6 +207,8 @@ void openValve()
     valveClosed = false;
     waterRunDurSec = 0;
     sendSimpleFlowData(0);
+
+  showPixelColorEx(1,0, 255, 0); // Start with red
 }
 
 void cycleValve()
@@ -371,11 +375,11 @@ void setValveMode(int newMode)
         Serial.println(statusMonitor);
 
         if(statusMonitor == 0){
-            showPixelColor(255, 255, 0);
+            showPixelColorEx(0,255, 255, 0);
         }else if(statusMonitor == 1){
-            showPixelColor(0, 255, 255);
+            showPixelColorEx(0,0, 255, 255);
         }else if(statusMonitor == 2){
-            showPixelColor(255, 0, 255);
+            showPixelColorEx(0,255, 0, 255);
         }
 
     }else{
