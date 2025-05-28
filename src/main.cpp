@@ -7,8 +7,8 @@
 
 /// Declare message variables
 bool valveClosed = false;
-int statusMonitor = 1;  // 0 manual : 1 Home : 2 Away
-int statusProperty = 1;
+int statusMonitor = 2;  // 0 manual : 1 Home : 2 Away
+int statusProperty = 2;
 
 ////////////
 // Timer Setup
@@ -62,6 +62,6 @@ void loop()
   {
     timerCheckMs = millis();
 
-  connectToMQTT();
+    reconnectIfNeeded();
   }
 }

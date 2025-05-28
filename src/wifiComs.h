@@ -28,18 +28,19 @@ void showPixelColorOnboard(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void showPixelColorEx(int ledNum,uint8_t r, uint8_t g, uint8_t b) {
-  strip.setPixelColor(ledNum, strip.Color(r, g, b));      // Red
+  strip.setPixelColor(ledNum, strip.Color(g, r, b));      // Red
   strip.show();
 }
 
 void startNeoPixel() {
   pixelOnboard.begin();
-  pixelOnboard.setBrightness(50);  // Optional brightness limit
+  pixelOnboard.setBrightness(75);  // Optional brightness limit
   strip.begin();
-  strip.setBrightness(50);  // Optional brightness limit
+  strip.setBrightness(75);  // Optional brightness limit
   showPixelColorOnboard(255, 0, 0); // Start with red
   showPixelColorEx(0,255, 0, 0); // Start with red
   showPixelColorEx(1,255, 0, 0); // Start with red
+  showPixelColorEx(2,255, 0, 0); // Start with red
 
 }
 
@@ -54,6 +55,10 @@ void startNeoPixel() {
 void connectToWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(SECRET_SSID, SECRET_PASS);
+  
+   // showPixelColorOnboard(255, 0, 0);  // Turn green on success
+    
+   // showPixelColorEx(2,255, 255, 0); // Turn green on success
 
   Serial.println("Connecting to WiFi...");
   for (int i = 0; i < 4; i++) {
@@ -65,6 +70,8 @@ void connectToWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     
     showPixelColorOnboard(0, 255, 0);  // Turn green on success
+    
+    showPixelColorEx(2,0, 255, 0); // Turn green on success
     Serial.println("WiFi Connected!");
     Serial.print("IP Address: "); Serial.println(WiFi.localIP());
     Serial.print("MAC Address: "); Serial.println(WiFi.macAddress());

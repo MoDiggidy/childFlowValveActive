@@ -5,6 +5,7 @@
 #include "espMqtt.h"
 
 #define FLOW_SENSOR_PIN 27 // Replace with your flowmeter pin
+#define VALVE_RELAY 4            // Valve Relay Pin
 
 // === Configuration Constants ===
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
@@ -16,7 +17,6 @@ const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000 // Max cycle time in ms (e.g. 10 seconds)
 #define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening 
-#define VALVE_RELAY 33            // Valve Relay Pin
 
 // === Global Flow Variables ===
 bool waterRun = false;
@@ -208,7 +208,7 @@ void openValve()
     waterRunDurSec = 0;
     sendSimpleFlowData(0);
 
-  showPixelColorEx(1,0, 255, 0); // Start with red
+  showPixelColorEx(1,0, 255, 0); // green
 }
 
 void cycleValve()
@@ -341,7 +341,16 @@ void loadVolumeFromPrefs()
     oldTimeStamp = volumePrefs.getString("oldTimeStamp", "");
     minuteStampsPrevious = volumePrefs.getString("minStP", "");
     statusMonitor = volumePrefs.getInt("statusMonitor", statusMonitor);
+   // valveClosed = volumePrefs.getBool("valveClosed", false);
     volumePrefs.end();
+
+    ///update LEDS
+    //setValveMode(statusMonitorTemp);
+    //statusMonitor = statusMonitorTemp;
+
+    ///confirm valve status is real
+   
+
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
                   volumeHour, volumeMin, volumeDay, oldHour, oldDay);
@@ -358,6 +367,7 @@ void saveVolumeToPrefs()
     volumePrefs.putString("oldTimeStamp", oldTimeStamp);
     volumePrefs.putString("minStP", minuteStampsPrevious);
     volumePrefs.putInt("statusMonitor", statusMonitor);
+   // volumePrefs.putBool("valveClosed", valveClosed); 
 
     volumePrefs.end();
 
@@ -375,9 +385,9 @@ void setValveMode(int newMode)
         Serial.println(statusMonitor);
 
         if(statusMonitor == 0){
-            showPixelColorEx(0,255, 255, 0);
+            showPixelColorEx(0,255, 102, 0);
         }else if(statusMonitor == 1){
-            showPixelColorEx(0,0, 255, 255);
+            showPixelColorEx(0,0, 0, 255);
         }else if(statusMonitor == 2){
             showPixelColorEx(0,255, 0, 255);
         }

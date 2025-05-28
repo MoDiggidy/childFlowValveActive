@@ -372,4 +372,10 @@ void sendSimpleFlowData(int warning)
     }
 }
 
+void reconnectIfNeeded() {
+  if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) {
+    connectToMQTT();
+  }
+}
+
 #endif
