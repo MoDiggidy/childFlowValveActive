@@ -6,6 +6,8 @@
 
 #define FLOW_SENSOR_PIN 27 // Replace with your flowmeter pin
 #define VALVE_RELAY 4      // Valve Relay Pin
+#define BUTTON_MODE_PIN 32   // Button for mode control (statusMonitor)
+#define BUTTON_VALVE_PIN 12  // Button for valve toggle (valveClosed)
 
 // === Configuration Constants ===
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
@@ -17,6 +19,20 @@ const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000 // Max cycle time in ms (e.g. 10 seconds)
 #define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening
+
+// === ButtonMode tracking ===
+unsigned long buttonModePressStart = 0;
+unsigned long buttonModeLastDebounceTime = 0;
+bool buttonModeState = HIGH;
+bool buttonModeLastReading = HIGH;
+bool buttonModePreviouslyPressed = false;
+// === ButtonValve tracking ===
+unsigned long buttonValveLastDebounceTime = 0;
+bool buttonValveState = HIGH;
+bool buttonValveLastReading = HIGH;
+bool buttonValvePreviouslyPressed = false;
+const unsigned long debounceDelay = 50;
+const unsigned long LONG_PRESS_DURATION = 10000;
 
 // === Global Flow Variables ===
 bool waterRun = false;
@@ -76,6 +92,10 @@ void flowMeterSetup()
     Serial.print("Initialising Flowmeter Monitoring...");
     pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), pulseCounter, RISING);
+    
+ //establish buttons
+  pinMode(BUTTON_MODE_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_VALVE_PIN, INPUT_PULLUP);
     Serial.println("Done");
 
     //  Serial.printf("Old Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
@@ -85,6 +105,7 @@ void flowMeterSetup()
 void valveRelaySetup()
 {
     pinMode(VALVE_RELAY, OUTPUT); // Set the Valve Relay pin as output
+
 }
 
 void resetMaxValues()
@@ -324,6 +345,75 @@ void flowCalcs()
             saveVolumeToPrefs();
         }
     }
+}
+
+void checkButtonMode() {
+  bool currentReading = digitalRead(BUTTON_MODE_PIN);
+
+  if (currentReading != buttonModeLastReading) {
+    buttonModeLastDebounceTime = millis();
+  }
+
+  if ((millis() - buttonModeLastDebounceTime) > debounceDelay) {
+    if (currentReading != buttonModeState) {
+      buttonModeState = currentReading;
+
+      if (buttonModeState == LOW) {
+        buttonModePressStart = millis();
+        buttonModePreviouslyPressed = true;
+      } 
+      else if (buttonModePreviouslyPressed && buttonModeState == HIGH) {
+        unsigned long pressDuration = millis() - buttonModePressStart;
+
+        if (pressDuration >= LONG_PRESS_DURATION) {
+          Serial.println("ButtonMode long press: restarting...");
+          ESP.restart();
+        } else {
+          int statusMonitorTemp = statusMonitor + 1;
+          if (statusMonitorTemp > 2) {
+            statusMonitorTemp = 0;
+          }
+          setValveMode(statusMonitorTemp);
+          Serial.printf("ButtonMode short press: statusMonitor = %d\n", statusMonitor);
+        }
+
+        buttonModePreviouslyPressed = false;
+      }
+    }
+  }
+
+  buttonModeLastReading = currentReading;
+}
+
+void checkButtonValve() {
+  bool currentReading = digitalRead(BUTTON_VALVE_PIN);
+
+  if (currentReading != buttonValveLastReading) {
+    buttonValveLastDebounceTime = millis();
+  }
+
+  if ((millis() - buttonValveLastDebounceTime) > debounceDelay) {
+    if (currentReading != buttonValveState) {
+      buttonValveState = currentReading;
+
+      if (buttonValveState == LOW) {
+        buttonValvePreviouslyPressed = true;
+      } 
+      else if (buttonValvePreviouslyPressed && buttonValveState == HIGH) {
+        if(valveClosed){
+            openValve();
+        }
+        else
+        {
+            closeValve();
+        }
+        Serial.printf("ButtonValve short press: valveClosed = %s\n", valveClosed ? "true" : "false");
+        buttonValvePreviouslyPressed = false;
+      }
+    }
+  }
+
+  buttonValveLastReading = currentReading;
 }
 
 void loadVolumeFromPrefs()

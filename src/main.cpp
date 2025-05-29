@@ -49,6 +49,10 @@ void loop()
   esp_task_wdt_reset();
   mqttClient.loop();
   flowCalcs(); // run flow check
+
+  //check buttons
+  checkButtonMode();
+  checkButtonValve();
   
   //mqtt failed send resends
   if (millis() - lastRetryTime > RETRY_INTERVAL) {
