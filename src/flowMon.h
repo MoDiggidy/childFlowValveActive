@@ -5,7 +5,7 @@
 #include "espMqtt.h"
 
 #define FLOW_SENSOR_PIN 27 // Replace with your flowmeter pin
-#define VALVE_RELAY 4            // Valve Relay Pin
+#define VALVE_RELAY 4      // Valve Relay Pin
 
 // === Configuration Constants ===
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
@@ -16,7 +16,7 @@ const int waterRunMaxSec[3] = {0, 60, 30};
 const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000 // Max cycle time in ms (e.g. 10 seconds)
-#define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening 
+#define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening
 
 // === Global Flow Variables ===
 bool waterRun = false;
@@ -72,16 +72,13 @@ void IRAM_ATTR pulseCounter()
 
 void flowMeterSetup()
 {
+    
+    Serial.print("Initialising Flowmeter Monitoring...");
     pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), pulseCounter, RISING);
-    Serial.println("Flowmeter Monitoring Started...");
+    Serial.println("Done");
 
-    oldDay = getDay();
-    oldHour = getHour();
-    oldMin = getMinute();
-    minuteStampsPrevious = getDateTimeMin();
-
-    Serial.printf("Old Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
+    //  Serial.printf("Old Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
     loadVolumeFromPrefs(); // load values if lost on reset
 }
 
@@ -194,8 +191,8 @@ void closeValve()
     Serial.println("===========================");
     valveClosed = true;
     sendSimpleFlowData(1);
-    
-  showPixelColorEx(1,255, 0, 0); // Start with red
+
+    showPixelColorEx(1, 255, 0, 0); // Start with red
 }
 
 void openValve()
@@ -208,7 +205,7 @@ void openValve()
     waterRunDurSec = 0;
     sendSimpleFlowData(0);
 
-  showPixelColorEx(1,0, 255, 0); // green
+    showPixelColorEx(1, 0, 255, 0); // green
 }
 
 void cycleValve()
@@ -329,28 +326,34 @@ void flowCalcs()
     }
 }
 
-
 void loadVolumeFromPrefs()
-{
+{   
+    Serial.println("Loading Values from Memory...");
     volumePrefs.begin("flowvol", true); // read-only
     volumeHour = volumePrefs.getFloat("volHour", 0.0);
     volumeMin = volumePrefs.getFloat("volMin", 0.0);
     volumeDay = volumePrefs.getFloat("volDay", 0.0);
-    oldHour = volumePrefs.getInt("oldHour", oldHour);
-    oldDay = volumePrefs.getInt("oldDay", oldDay);
+    oldHour = volumePrefs.getInt("oldHour", 0);
+    oldDay = volumePrefs.getInt("oldDay", 0);
     oldTimeStamp = volumePrefs.getString("oldTimeStamp", "");
     minuteStampsPrevious = volumePrefs.getString("minStP", "");
-    statusMonitor = volumePrefs.getInt("statusMonitor", statusMonitor);
-   // valveClosed = volumePrefs.getBool("valveClosed", false);
+    int statusMonitorTemp = volumePrefs.getInt("statusMonitor", 1);
+    valveClosed = volumePrefs.getBool("valveClosed", false);
     volumePrefs.end();
 
-    ///update LEDS
-    //setValveMode(statusMonitorTemp);
-    //statusMonitor = statusMonitorTemp;
+    /// update LEDS
+    setValveMode(statusMonitorTemp);
+    // statusMonitor = statusMonitorTemp;
 
-    ///confirm valve status is real
-   
-
+    /// confirm valve status is real
+    if (valveClosed)
+    {
+        showPixelColorEx(1, 255, 0, 0); // red
+    }
+    else
+    {
+       showPixelColorEx(1, 0, 255, 0); // green
+    }
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
                   volumeHour, volumeMin, volumeDay, oldHour, oldDay);
@@ -358,6 +361,7 @@ void loadVolumeFromPrefs()
 
 void saveVolumeToPrefs()
 {
+    Serial.println("Saving values to memory...");
     volumePrefs.begin("flowvol", false);
     volumePrefs.putFloat("volHour", volumeHour);
     volumePrefs.putFloat("volMin", volumeMin);
@@ -367,37 +371,42 @@ void saveVolumeToPrefs()
     volumePrefs.putString("oldTimeStamp", oldTimeStamp);
     volumePrefs.putString("minStP", minuteStampsPrevious);
     volumePrefs.putInt("statusMonitor", statusMonitor);
-   // volumePrefs.putBool("valveClosed", valveClosed); 
+    volumePrefs.putBool("valveClosed", valveClosed);
 
     volumePrefs.end();
 
-    Serial.println("Saved volume values to preferences.");
     volumeNeedsSave = false;
     lastVolumeSave = millis();
+    Serial.println("Done");
 }
 
 void setValveMode(int newMode)
 {
-    if(newMode != statusMonitor){
+    if (newMode != statusMonitor)
+    {
         statusMonitor = newMode;
         saveVolumeToPrefs();
-        Serial.print("Valve mode set to: ");
+        Serial.print("Valve mode updated to: ");
         Serial.println(statusMonitor);
 
-        if(statusMonitor == 0){
-            showPixelColorEx(0,255, 102, 0);
-        }else if(statusMonitor == 1){
-            showPixelColorEx(0,0, 0, 255);
-        }else if(statusMonitor == 2){
-            showPixelColorEx(0,255, 0, 255);
+        if (statusMonitor == 0)
+        {
+            showPixelColorEx(0, 255, 102, 0);
         }
-
-    }else{
+        else if (statusMonitor == 1)
+        {
+            showPixelColorEx(0, 0, 0, 255);
+        }
+        else if (statusMonitor == 2)
+        {
+            showPixelColorEx(0, 255, 0, 255);
+        }
+    }
+    else
+    {
         Serial.print("Valve mode not updated, already set to: ");
         Serial.println(statusMonitor);
     }
-
-
 }
 
 #endif

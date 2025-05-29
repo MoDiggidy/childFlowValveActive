@@ -7,14 +7,14 @@
 
 /// Declare message variables
 bool valveClosed = false;
-int statusMonitor = 2;  // 0 manual : 1 Home : 2 Away
+int statusMonitor = 3;  // 0 manual : 1 Home : 2 Away
 int statusProperty = 2;
 
 ////////////
 // Timer Setup
 ////////////
 unsigned long timerCheckMs;        // establish variable to check timer loop
-unsigned long timerTimeMs = 30000; // set timer loop  to 15 seconds
+unsigned long timerTimeMs = 10000; // set timer loop  to 15 seconds
 #define WDT_TIMEOUT 300       //  watchdog loop timer seconds
 
 void setup()
@@ -26,9 +26,9 @@ void setup()
   esp_task_wdt_add(NULL);
 
   
+  startNeoPixel();
   flowMeterSetup();
 
-  startNeoPixel();
   connectToWiFi();
   //initESPNow();
 
@@ -61,7 +61,7 @@ void loop()
   if (millis() - timerCheckMs > timerTimeMs)
   {
     timerCheckMs = millis();
-
+     checkWiFiReconnect();
     reconnectIfNeeded();
   }
 }

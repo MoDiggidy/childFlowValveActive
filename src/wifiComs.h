@@ -33,6 +33,7 @@ void showPixelColorEx(int ledNum,uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void startNeoPixel() {
+  Serial.print("Starting NeoPixels...");
   pixelOnboard.begin();
   pixelOnboard.setBrightness(75);  // Optional brightness limit
   strip.begin();
@@ -41,6 +42,7 @@ void startNeoPixel() {
   showPixelColorEx(0,255, 0, 0); // Start with red
   showPixelColorEx(1,255, 0, 0); // Start with red
   showPixelColorEx(2,255, 0, 0); // Start with red
+  Serial.println("Done");
 
 }
 
@@ -82,7 +84,34 @@ void connectToWiFi() {
   }
 }
 
+void checkWiFiReconnect() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected! Attempting to reconnect...");
+    showPixelColorOnboard(255, 255, 0);  // Yellow for reconnecting
+    showPixelColorEx(2, 255, 255, 0);
 
+    WiFi.disconnect(true);
+    delay(1000);
+    WiFi.begin(SECRET_SSID, SECRET_PASS);
+
+    unsigned long startAttempt = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 10000) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("WiFi reconnected.");
+      showPixelColorOnboard(0, 255, 0);  // Green
+      showPixelColorEx(2, 0, 255, 0);
+    } else {
+      Serial.println("Reconnection failed.");
+      showPixelColorOnboard(255, 0, 0);  // Red
+      showPixelColorEx(2, 255, 0, 0);
+    }
+  }
+}
 ///////////////////
 ///Time
 ///////////
