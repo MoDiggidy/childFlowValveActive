@@ -139,7 +139,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
         }
     }
 }
-
+  //
 void connectToMQTT()
 {
     unsigned long startAttempt = millis();
@@ -325,7 +325,7 @@ void sendFlowData(
         savePayloadToBuffer(payload);
     }
 }
-
+ 
 void sendSimpleFlowData(int warning)
 {
 
