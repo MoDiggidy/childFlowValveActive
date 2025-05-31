@@ -4,10 +4,10 @@
 #include <Preferences.h>
 #include "espMqtt.h"
 
-#define FLOW_SENSOR_PIN 27 // Replace with your flowmeter pin
-#define VALVE_RELAY 4      // Valve Relay Pin
-#define BUTTON_MODE_PIN 32   // Button for mode control (statusMonitor)
-#define BUTTON_VALVE_PIN 12  // Button for valve toggle (valveClosed)
+#define FLOW_SENSOR_PIN 27  // Replace with your flowmeter pin
+#define VALVE_RELAY 4       // Valve Relay Pin
+#define BUTTON_MODE_PIN 32  // Button for mode control (statusMonitor)
+#define BUTTON_VALVE_PIN 12 // Button for valve toggle (valveClosed)
 
 // === Configuration Constants ===
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
@@ -88,14 +88,14 @@ void IRAM_ATTR pulseCounter()
 
 void flowMeterSetup()
 {
-    
+
     Serial.print("Initialising Flowmeter Monitoring...");
     pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), pulseCounter, RISING);
-    
- //establish buttons
-  pinMode(BUTTON_MODE_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_VALVE_PIN, INPUT_PULLUP);
+
+    // establish buttons
+    pinMode(BUTTON_MODE_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_VALVE_PIN, INPUT_PULLUP);
     Serial.println("Done");
 
     //  Serial.printf("Old Times >> Day: %d  Hour: %d  Min: %d\n", oldDay, oldHour, oldMin);
@@ -105,7 +105,6 @@ void flowMeterSetup()
 void valveRelaySetup()
 {
     pinMode(VALVE_RELAY, OUTPUT); // Set the Valve Relay pin as output
-
 }
 
 void resetMaxValues()
@@ -347,77 +346,94 @@ void flowCalcs()
     }
 }
 
-void checkButtonMode() {
-  bool currentReading = digitalRead(BUTTON_MODE_PIN);
+void checkButtonMode()
+{
+    bool currentReading = digitalRead(BUTTON_MODE_PIN);
 
-  if (currentReading != buttonModeLastReading) {
-    buttonModeLastDebounceTime = millis();
-  }
-
-  if ((millis() - buttonModeLastDebounceTime) > debounceDelay) {
-    if (currentReading != buttonModeState) {
-      buttonModeState = currentReading;
-
-      if (buttonModeState == LOW) {
-        buttonModePressStart = millis();
-        buttonModePreviouslyPressed = true;
-      } 
-      else if (buttonModePreviouslyPressed && buttonModeState == HIGH) {
-        unsigned long pressDuration = millis() - buttonModePressStart;
-
-        if (pressDuration >= LONG_PRESS_DURATION) {
-          Serial.println("ButtonMode long press: restarting...");
-          ESP.restart();
-        } else {
-          int statusMonitorTemp = statusMonitor + 1;
-          if (statusMonitorTemp > 2) {
-            statusMonitorTemp = 0;
-          }
-          setValveMode(statusMonitorTemp);
-          Serial.printf("ButtonMode short press: statusMonitor = %d\n", statusMonitor);
-        }
-
-        buttonModePreviouslyPressed = false;
-      }
+    if (currentReading != buttonModeLastReading)
+    {
+        buttonModeLastDebounceTime = millis();
     }
-  }
 
-  buttonModeLastReading = currentReading;
+    if ((millis() - buttonModeLastDebounceTime) > debounceDelay)
+    {
+        if (currentReading != buttonModeState)
+        {
+            buttonModeState = currentReading;
+
+            if (buttonModeState == LOW)
+            {
+                buttonModePressStart = millis();
+                buttonModePreviouslyPressed = true;
+            }
+            else if (buttonModePreviouslyPressed && buttonModeState == HIGH)
+            {
+                unsigned long pressDuration = millis() - buttonModePressStart;
+
+                if (pressDuration >= LONG_PRESS_DURATION)
+                {
+                    Serial.println("ButtonMode long press: restarting...");
+                    ESP.restart();
+                }
+                else
+                {
+                    int statusMonitorTemp = statusMonitor + 1;
+                    if (statusMonitorTemp > 2)
+                    {
+                        statusMonitorTemp = 0;
+                    }
+                    setValveMode(statusMonitorTemp);
+                    Serial.printf("ButtonMode short press: statusMonitor = %d\n", statusMonitor);
+                }
+
+                buttonModePreviouslyPressed = false;
+            }
+        }
+    }
+
+    buttonModeLastReading = currentReading;
 }
 
-void checkButtonValve() {
-  bool currentReading = digitalRead(BUTTON_VALVE_PIN);
+void checkButtonValve()
+{
+    bool currentReading = digitalRead(BUTTON_VALVE_PIN);
 
-  if (currentReading != buttonValveLastReading) {
-    buttonValveLastDebounceTime = millis();
-  }
-
-  if ((millis() - buttonValveLastDebounceTime) > debounceDelay) {
-    if (currentReading != buttonValveState) {
-      buttonValveState = currentReading;
-
-      if (buttonValveState == LOW) {
-        buttonValvePreviouslyPressed = true;
-      } 
-      else if (buttonValvePreviouslyPressed && buttonValveState == HIGH) {
-        if(valveClosed){
-            openValve();
-        }
-        else
-        {
-            closeValve();
-        }
-        Serial.printf("ButtonValve short press: valveClosed = %s\n", valveClosed ? "true" : "false");
-        buttonValvePreviouslyPressed = false;
-      }
+    if (currentReading != buttonValveLastReading)
+    {
+        buttonValveLastDebounceTime = millis();
     }
-  }
 
-  buttonValveLastReading = currentReading;
+    if ((millis() - buttonValveLastDebounceTime) > debounceDelay)
+    {
+        if (currentReading != buttonValveState)
+        {
+            buttonValveState = currentReading;
+
+            if (buttonValveState == LOW)
+            {
+                buttonValvePreviouslyPressed = true;
+            }
+            else if (buttonValvePreviouslyPressed && buttonValveState == HIGH)
+            {
+                if (valveClosed)
+                {
+                    openValve();
+                }
+                else
+                {
+                    closeValve();
+                }
+                Serial.printf("ButtonValve short press: valveClosed = %s\n", valveClosed ? "true" : "false");
+                buttonValvePreviouslyPressed = false;
+            }
+        }
+    }
+
+    buttonValveLastReading = currentReading;
 }
 
 void loadVolumeFromPrefs()
-{   
+{
     Serial.println("Loading Values from Memory...");
     volumePrefs.begin("flowvol", true); // read-only
     volumeHour = volumePrefs.getFloat("volHour", 0.0);
@@ -432,7 +448,7 @@ void loadVolumeFromPrefs()
     volumePrefs.end();
 
     /// update LEDS
-    setValveMode(statusMonitorTemp);
+    setValveMode(statusMonitorTemp,false);
     // statusMonitor = statusMonitorTemp;
 
     /// confirm valve status is real
@@ -442,7 +458,7 @@ void loadVolumeFromPrefs()
     }
     else
     {
-       showPixelColorEx(1, 0, 255, 0); // green
+        showPixelColorEx(1, 0, 255, 0); // green
     }
 
     Serial.printf("Restored Volumes - Hour: %.2f  Min: %.2f  Day: %.2f || Old Hour: %d  Old Day: %d\n",
@@ -470,7 +486,7 @@ void saveVolumeToPrefs()
     Serial.println("Done");
 }
 
-void setValveMode(int newMode)
+void setValveMode(int newMode, bool sendMqttMsg)
 {
     if (newMode != statusMonitor)
     {
@@ -479,6 +495,8 @@ void setValveMode(int newMode)
         Serial.print("Valve mode updated to: ");
         Serial.println(statusMonitor);
 
+        
+        
         if (statusMonitor == 0)
         {
             showPixelColorEx(0, 255, 102, 0);
@@ -490,6 +508,11 @@ void setValveMode(int newMode)
         else if (statusMonitor == 2)
         {
             showPixelColorEx(0, 255, 0, 255);
+        }
+
+        if(sendMqttMsg)
+        {
+            sendSimpleFlowData(0);
         }
     }
     else

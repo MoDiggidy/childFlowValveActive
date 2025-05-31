@@ -5,23 +5,13 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include "esp_task_wdt.h"
+#include "mySecrets.h"
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 Preferences preferences;
 
 // === CONFIGURATION ===
-
-const char *MQTT_Client_ID = "6556DomFlow1";
-const char *mqtt_server = "10.140.1.95";                                             // Replace with your MQTT broker IP
-const char *mqtt_fullflow_topic = "6556/water/domestic/domesticSupplyFlow/flowData"; // Your topic
-const char *mqtt_simpleflow_topic = "6556/water/domestic/domesticSupplyFlow/simpleFlowData";
-const char *mqtt_lwt_topic = "6556/water/domestic/domesticSupplyFlow/status";
-const char *mqtt_lwt_message = "offline";
-const char *mqtt_online_message = "online";
-
-const char *mqtt_command_topic = "6556/water/domestic/domesticSupplyFlow/cmdSend";
-const char *mqtt_ack_topic = "6556/water/domestic/domesticSupplyFlow/Ack";
 
 
 #define RETRY_INTERVAL 60000UL // 1 min
@@ -32,19 +22,49 @@ unsigned long lastRetryTime = 0;
 unsigned long lastSend = 0;
 bool isCyclingValve = false;
 
+
+const char* mqtt_server = MQTT_SERVER;
+
+const char* mqtt_lwt_message = "offline";
+const char* mqtt_online_message = "online";
+
+// Temporary Strings to build topics
+String topicBaseStr = String(TOPIC_BASE_STR);
+String mqttClientBase = String(MQTT_CLIENT_ID);
+
+String topic_fullflow_str   = topicBaseStr + mqttClientBase + "/flowData";
+String topic_simpleflow_str = topicBaseStr + mqttClientBase + "/simpleFlowData";
+String topic_lwt_str        = topicBaseStr + mqttClientBase + "/status";
+String topic_command_str    = topicBaseStr + mqttClientBase + "/cmdSend";
+String topic_ack_str        = topicBaseStr + mqttClientBase + "/Ack";
+
+// Final const char* pointers (converted from Strings)
+const char* mqtt_fullflow_topic   = topic_fullflow_str.c_str();
+const char* mqtt_simpleflow_topic = topic_simpleflow_str.c_str();
+const char* mqtt_lwt_topic        = topic_lwt_str.c_str();
+const char* mqtt_command_topic    = topic_command_str.c_str();
+const char* mqtt_ack_topic        = topic_ack_str.c_str();
+
+
+
+
+/////Decalre external variables and functions
+
 extern float flow10s;
 extern float flowAvgValue;
 extern bool valveClosed;
 extern long unsigned int waterRunDurSec;
 extern int statusMonitor;
 
-// ==== FUNCTION DECLARATIONS ====
 extern void closeValve();
 extern void openValve();
 extern void cycleValve();
 extern void saveVolumeToPrefs();
-extern void setValveMode(int newMode);
+extern void setValveMode(int newMode,bool sendMqttMsg = true);
 extern void connectToWiFi();
+
+
+// ==== FUNCTION DECLARATIONS ====
 void connectToMQTT();
 bool sendMQTTMessage(const char *payload);
 void savePayloadToBuffer(const char *payload);
@@ -151,7 +171,7 @@ void connectToMQTT()
         mqttClient.setBufferSize(512); // or 1024 for very large messages
         // Set username and password here
         if (mqttClient.connect(
-                MQTT_Client_ID,       // Client ID
+                MQTT_CLIENT_ID,       // Client ID
                 MQTT_USER, MQTT_PASS, // Username and Password
                 mqtt_lwt_topic, 1, true,
                 mqtt_lwt_message)) // Last Will message
