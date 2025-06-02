@@ -11,7 +11,7 @@
 ///neopixel
 ////////////////////////////
 
-#define NEOPIXELEX_PIN 14
+#define NEOPIXELEX_PIN 7
 #define NEOPIXEL_COUNT 3
 
 #define NEOPIXEL_PIN PIN_NEOPIXEL

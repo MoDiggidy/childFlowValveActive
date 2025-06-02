@@ -4,10 +4,10 @@
 #include <Preferences.h>
 #include "espMqtt.h"
 
-#define FLOW_SENSOR_PIN 27  // Replace with your flowmeter pin
+#define FLOW_SENSOR_PIN 25  // Replace with your flowmeter pin
 #define VALVE_RELAY 4       // Valve Relay Pin
 #define BUTTON_MODE_PIN 32  // Button for mode control (statusMonitor)
-#define BUTTON_VALVE_PIN 12 // Button for valve toggle (valveClosed)
+#define BUTTON_VALVE_PIN 33 // Button for valve toggle (valveClosed)
 
 // === Configuration Constants ===
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
