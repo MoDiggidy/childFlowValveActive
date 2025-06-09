@@ -3,7 +3,7 @@
 
 ///Wifi Variables
 #define SECRET_SSID "iceshots2"
-#define SECRET_PASS "esmerose1"
+#define SECRET_PASS "esmerose"
 
  ///MQTT Variables
 #define MQTT_CLIENT_ID "irrigationBypassFlow"
