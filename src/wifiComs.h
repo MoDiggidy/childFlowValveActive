@@ -214,134 +214,48 @@ void updateTime()
   }
 }
 
-int getMonth()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
+
+
+int getTimeInt(String key) {
+  if (!isWifiConnected() || !isNtpTimeConnected) return -1;
   struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_mon + 1;
+  if (!getLocalTime(&timeinfo)) return -1;
+
+  if (key == "Year") return timeinfo.tm_year + 1900;
+  if (key == "Month") return timeinfo.tm_mon + 1;
+  if (key == "Day") return timeinfo.tm_mday;
+  if (key == "Hour") return timeinfo.tm_hour;
+  if (key == "Minute") return timeinfo.tm_min;
+  if (key == "Second") return timeinfo.tm_sec;
+  if (key == "MinutesToday") return timeinfo.tm_hour * 60 + timeinfo.tm_min;
+
   return -1;
 }
 
-int getDay()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
+String getTimeString(String key) {
+  if (!isWifiConnected() || !isNtpTimeConnected) return "0000-00-00 00:00:00";
   struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_mday;
-  return -1;
-}
+  if (!getLocalTime(&timeinfo)) return "0000-00-00 00:00:00";
 
-int getHour()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_hour;
-  return -1;
-}
-
-int getMinute()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_min;
-  return -1;
-}
-
-int getSecond()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_sec;
-  return -1;
-}
-int getYear()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-    return timeinfo.tm_year + 1900;
-  return -1;
-}
-
-String getDateTime()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return String("0000-00-00 00:00:00");
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-  {
-    char buffer[25];
+  char buffer[26];
+  if (key == "DateTime") {
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
     return String(buffer);
   }
-  return String("0000-00-00 00:00:00");
-}
-
-String getDate()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return String("0000-00-00");
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-  {
-    char buffer[15];
+  if (key == "Date") {
     strftime(buffer, sizeof(buffer), "%Y-%m-%d", &timeinfo);
     return String(buffer);
   }
-  return String("0000-00-00");
-}
-
-String getTime()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return String("00:00:00");
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-  {
-    char buffer[10];
+  if (key == "Time") {
     strftime(buffer, sizeof(buffer), "%H:%M:%S", &timeinfo);
     return String(buffer);
   }
-  return String("00:00:00");
-}
-
-int getMinutesToday()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return -1;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-  {
-    return timeinfo.tm_hour * 60 + timeinfo.tm_min;
-  }
-  return -1; // error
-}
-
-String getDateTimeMin()
-{
-  if (!isWifiConnected() || !isNtpTimeConnected)
-    return String("1970-01-01T00:00");
-  ;
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo))
-  {
-    char buffer[20]; // "YYYY-MM-DDTHH:MM"
+  if (key == "DateTimeMin") {
     strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M", &timeinfo);
     return String(buffer);
   }
 
-  // Return a fallback timestamp or local milliseconds
-  return String("1970-01-01T00:00"); // or String(millis()) for uniqueness
+  return "0000-00-00 00:00:00";
 }
 
 #endif

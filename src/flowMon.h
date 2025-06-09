@@ -75,7 +75,7 @@ bool volumeNeedsSave = false;
 unsigned long lastVolumeSave = 0;
 const unsigned long volumeSaveInterval = 60000; // Save every 60s if dirty
 
-String oldTimeStamp = getDateTimeMin();
+String oldTimeStamp = getTimeString("DateTimeMin");
 
 // === Max Volume Tracking ===
 float max1Min = 0, max10Sec = 0, max10Min = 0, max30Min = 0;
@@ -171,7 +171,7 @@ void calculateFlowStats(float volumeNowgal)
 {
     flowSamples[sampleIndex] = flowAvg[flowAvgIndex] = volumeNowgal * galPerMinFactor;
     minuteStamps[sampleIndex] = minuteStampsPrevious;
-    minuteStampsPrevious = getDateTimeMin();
+    minuteStampsPrevious = getTimeString("DateTimeMin");
 
     updateVolumes(sampleIndex);
     sampleIndex = (sampleIndex + 1) % maxIntervals;
@@ -282,30 +282,30 @@ void handleValveLogic()
 
 void handleTimedEvents()
 {
-    if (oldMin != getMinute())
+    if (oldMin != getTimeInt("Minute"))
     {
         Serial.println("<<<>>> NEW Minute");
         volumeMin = 0;
-        oldMin = getMinute();
+        oldMin = getTimeInt("Minute");
         volumeNeedsSave = true;
     }
 
-    if (oldHour != getHour())
+    if (oldHour != getTimeInt("Hour"))
     {
         Serial.printf("\n<<<>>> NEW Hour:: Day Volume: %.2f\n\n", volumeHour);
         sendflow(oldTimeStamp, volumeHour);
-        oldTimeStamp = getDateTimeMin();
+        oldTimeStamp = getTimeString("DateTimeMin");
         volumeHour = 0;
-        oldHour = getHour();
+        oldHour = getTimeInt("Hour");
         volumeNeedsSave = true;
         resetMaxValues();
     }
 
-    if (oldDay != getDay())
+    if (oldDay != getTimeInt("Day"))
     {
         Serial.printf("\n<<<>>> NEW DAY:: Day Volume: %.2f\n\n", volumeDay);
         volumeDay = 0;
-        oldDay = getDay();
+        oldDay = getTimeInt("Day");
         volumeNeedsSave = true;
     }
 

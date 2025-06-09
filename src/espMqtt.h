@@ -88,7 +88,7 @@ void sendAck(const char *cmd, const char *status)
     StaticJsonDocument<128> ack;
     ack["cmd"] = cmd;
     ack["status"] = status;
-    ack["timeStamp"] = getDateTimeMin();
+    ack["timeStamp"] = getTimeString("getDateTimeMin");
 
     char response[128];
     serializeJson(ack, response);
@@ -391,7 +391,7 @@ void sendSimpleFlowData(int warning)
     doc["runTime"] = waterRunDurSec;
     doc["valveMode"] = statusMonitor;
     doc["warning"] = warning;
-    doc["timeStamp"] = getDateTimeMin();
+    doc["timeStamp"] = getTimeString("DateTimeMin");
 
     size_t size = measureJson(doc);
     if (size > 384)
