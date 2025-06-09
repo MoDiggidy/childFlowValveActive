@@ -16,7 +16,9 @@
 #define NEOPIXEL_PIN PIN_NEOPIXEL
 
 unsigned long wifiCheckMs = 0;     // establish variable to check timer loop
-unsigned long wifiTimeMs = 120000; // set wifi reconnect timer miliseconds
+unsigned long wifiTimeMs = 240000; // set wifi reconnect timer miliseconds
+unsigned long wifiConnectTimeMs = 10000; // how long to wait for wifi to connect miliseconds
+
 
 Adafruit_NeoPixel pixelOnboard(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -63,34 +65,36 @@ void connectToWiFi()
   // showPixelColorEx(2,255, 255, 0); // Turn green on success
 
   Serial.println("Connecting to WiFi...");
-  for (int i = 0; i < 1; i++)
-  {
-    if (WiFi.waitForConnectResult() == WL_CONNECTED)
-      break;
-    delay(1000);
-    Serial.println("Retrying...");
-  }
+      unsigned long startAttempt = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeMs)
+      {
+        delay(500);
+        Serial.print(".");
+      }
+      Serial.println();
 
-  if (WiFi.status() == WL_CONNECTED)
-  {
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        showPixelColorOnboard(0, 255, 0); // Turn green on success
+        showPixelColorEx(2, 0, 255, 0); // Turn green on success
+        Serial.println("WiFi Connected!");
+        Serial.print("IP Address: ");
+        Serial.println(WiFi.localIP());
+        Serial.print("MAC Address: ");
+        Serial.println(WiFi.macAddress());
+        Serial.print("WiFi Channel: ");
+        Serial.println(WiFi.channel());
+        Serial.print("WiFi Signal Strength:");
+        Serial.println(WiFi.RSSI());
+      }
+      else
+      {
+        Serial.println("Failed to connect to WiFi.");
+        showPixelColorOnboard(255, 0, 0); // Red
+        showPixelColorEx(2, 255, 0, 0);
+      }
 
-    showPixelColorOnboard(0, 255, 0); // Turn green on success
 
-    showPixelColorEx(2, 0, 255, 0); // Turn green on success
-    Serial.println("WiFi Connected!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("MAC Address: ");
-    Serial.println(WiFi.macAddress());
-    Serial.print("WiFi Channel: ");
-    Serial.println(WiFi.channel());
-    Serial.print("WiFi Signal Strength:");
-    Serial.println(WiFi.RSSI());
-  }
-  else
-  {
-    Serial.println("Failed to connect to WiFi.");
-  }
 }
 
 void checkWiFiReconnect()
@@ -110,7 +114,7 @@ void checkWiFiReconnect()
       WiFi.begin(SECRET_SSID, SECRET_PASS);
 
       unsigned long startAttempt = millis();
-      while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 10000)
+      while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeMs)
       {
         delay(500);
         Serial.print(".");
@@ -280,11 +284,13 @@ String getDateTimeMin()
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
-    char buffer[20]; // "YYYY-MM-DDTHH:MM" + null = 17 + 1
+    char buffer[20]; // "YYYY-MM-DDTHH:MM"
     strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M", &timeinfo);
     return String(buffer);
   }
-  return "Invalid";
+
+  // Return a fallback timestamp or local milliseconds
+  return String("1970-01-01T00:00");  // or String(millis()) for uniqueness
 }
 
 #endif

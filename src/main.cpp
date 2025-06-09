@@ -3,11 +3,9 @@
 #include "flowMon.h"
 #include "espMqtt.h"
 
-//#include "espNow.h"
+// #include "espNow.h"
 
 /// Declare message variables
-bool valveClosed = false;
-int statusMonitor = 3;  // 0 manual : 1 Home : 2 Away
 int statusProperty = 2;
 
 ////////////
@@ -15,7 +13,7 @@ int statusProperty = 2;
 ////////////
 unsigned long timerCheckMs;        // establish variable to check timer loop
 unsigned long timerTimeMs = 10000; // set timer loop  to 15 seconds
-#define WDT_TIMEOUT 300       //  watchdog loop timer seconds
+#define WDT_TIMEOUT 300            //  watchdog loop timer seconds
 
 void setup()
 {
@@ -25,47 +23,50 @@ void setup()
   esp_task_wdt_init(WDT_TIMEOUT, true);
   esp_task_wdt_add(NULL);
 
-  
   startNeoPixel();
   flowMeterSetup();
 
   connectToWiFi();
-  //initESPNow();
+  // initESPNow();
 
   // Initialize NTP client and force sync
   initTime();
-  
-  ///mqtt setup
+
+  /// mqtt setup
   mqttClient.setServer(mqtt_server, 1883);
   mqttClient.setKeepAlive(CUSTOM_MQTT_KEEPALIVE);
   connectToMQTT();
 
   valveRelaySetup();
-
 }
 
 void loop()
 {
   esp_task_wdt_reset();
-  mqttClient.loop();
-  flowCalcs(); // run flow check
 
-  //check buttons
+  // check buttons
   checkButtonMode();
   checkButtonValve();
-  
-  //mqtt failed send resends
-  if (millis() - lastRetryTime > RETRY_INTERVAL) {
+
+  if (WiFi.status() == WL_CONNECTED && mqttClient.connected())
+  {
+    mqttClient.loop(); //keep mqtt alive
+  }
+  flowCalcs(); // run flow check
+
+  // mqtt failed send resends
+  if (millis() - lastRetryTime > RETRY_INTERVAL)
+  {
     retryUnsentPayloads();
     lastRetryTime = millis();
   }
-  
+
   /// basic timer
   ///////////////
   if (millis() - timerCheckMs > timerTimeMs)
   {
     timerCheckMs = millis();
-     checkWiFiReconnect();
+    checkWiFiReconnect();
     reconnectIfNeeded();
   }
 }

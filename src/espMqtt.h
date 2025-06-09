@@ -13,7 +13,7 @@ Preferences preferences;
 
 // === CONFIGURATION ===
 
-#define RETRY_INTERVAL 60000UL // How long to wait to try resending old mqtt messages miliseconds
+#define RETRY_INTERVAL 120000UL // How long to wait to try resending old mqtt messages miliseconds
 #define BUFFER_SIZE 24         // up to 24 hours of data
 #define CUSTOM_MQTT_KEEPALIVE 60
 
@@ -61,7 +61,7 @@ extern void closeValve();
 extern void openValve();
 extern void cycleValve();
 extern void saveVolumeToPrefs();
-extern void setValveMode(int newMode, bool sendMqttMsg = true);
+extern void setValveMode(int newMode);
 extern void connectToWiFi();
 
 // ==== FUNCTION DECLARATIONS ====
@@ -162,19 +162,28 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 //
 void connectToMQTT()
 {
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("Connecting to MQTT skipped: no wifi");
+        return;
+    }
+
     unsigned long startAttempt = millis();
     const unsigned long maxDuration = 5000; // 5 seconds max
 
     // If MQTT is already connected or it's too soon to retry, skip
-if (mqttClient.connected()) {
-    Serial.println("Connecting to MQTT skipped: already connected");
-    return;
-}
+    if (mqttClient.connected())
+    {
+        Serial.println("Connecting to MQTT skipped: already connected");
+        return;
+    }
 
-if (lastMQTTConnectAttempt != 0 && millis() - lastMQTTConnectAttempt < mqttReconnectIntervalMS) {
-    Serial.println("Connecting to MQTT skipped: waiting for retry window.");
-    return;
-}
+    if (lastMQTTConnectAttempt != 0 && millis() - lastMQTTConnectAttempt < mqttReconnectIntervalMS)
+    {
+        Serial.println("Connecting to MQTT skipped: waiting for retry window.");
+        return;
+    }
 
     Serial.print("Connecting to MQTT...");
     lastMQTTConnectAttempt = millis(); // Mark this attempt time
@@ -367,6 +376,12 @@ void sendFlowData(
 
 void sendSimpleFlowData(int warning)
 {
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("Skipping sendSimpleFlowData: no WiFi.");
+        return;
+    }
 
     StaticJsonDocument<384> doc;
 

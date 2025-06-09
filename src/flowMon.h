@@ -9,6 +9,9 @@
 #define BUTTON_MODE_PIN 32  // Button for mode control (statusMonitor)
 #define BUTTON_VALVE_PIN 33 // Button for valve toggle (valveClosed)
 
+bool valveClosed = false;
+int statusMonitor = 3;  // 0 manual : 1 Home : 2 Away
+
 // === Configuration Constants ===
 const unsigned int pulseDebounceMmS = 200000 ;  //debounce time for pulse meter pule count in microseconds
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
@@ -41,7 +44,7 @@ const unsigned long LONG_PRESS_DURATION = 10000;
 bool waterRun = false;
 unsigned long waterRunDurSec = 0;
 unsigned long lastWaterRunDurSec = 0;
-
+int warningAlert = 0;  //flag to include mqtt warning
 unsigned long waterStopDurSec = 0;
 float flowSamples[maxIntervals] = {0};
 String minuteStamps[maxIntervals] = {""};
@@ -53,6 +56,8 @@ float flowAvgValue = 0;
 float lastFlowAvgValue = 0;
 float flow10s = 0;
 float lastFlow10s = 0;
+int lastValveClosed = 3;
+int LastStatusMonitor = 4;
 unsigned long timerUpdateCheckMs = 0;
 unsigned long timerSendFlowCheckMs = 0;
 volatile unsigned long pulseCount = 0;
@@ -76,9 +81,6 @@ String oldTimeStamp = getDateTimeMin();
 float max1Min = 0, max10Sec = 0, max10Min = 0, max30Min = 0;
 String max1MinTime = "", max10SecTime = "", max10MinTime = "", max30MinTime = "";
 
-// === External Valve/State Flags ===
-extern bool valveClosed;
-extern int statusMonitor;
 
 // declaire functions early
 void saveVolumeToPrefs();
@@ -218,7 +220,7 @@ void closeValve()
     Serial.println("!!!!!!!!SHUT OFF WATER!!!!!");
     Serial.println("===========================");
     valveClosed = true;
-    sendSimpleFlowData(1);
+    warningAlert = 1;
 
     showPixelColorEx(1, 255, 0, 0); // Start with red
 }
@@ -231,7 +233,7 @@ void openValve()
     Serial.println("===========================");
     valveClosed = false;
     waterRunDurSec = 0;
-    sendSimpleFlowData(0);
+ 
 
     showPixelColorEx(1, 0, 255, 0); // green
 }
@@ -310,13 +312,16 @@ void handleTimedEvents()
     if (millis() - timerSendFlowCheckMs > sendFlowTimeMs)
     {
         timerSendFlowCheckMs = millis();
-        if (flow10s != lastFlow10s || flowAvgValue != lastFlowAvgValue || waterRunDurSec != lastWaterRunDurSec)
+        if (flow10s != lastFlow10s || flowAvgValue != lastFlowAvgValue || waterRunDurSec != lastWaterRunDurSec || lastValveClosed != valveClosed || LastStatusMonitor!= statusMonitor)
         {
 
             lastFlow10s = flow10s;
             lastFlowAvgValue = flowAvgValue;
             lastWaterRunDurSec = waterRunDurSec;
-            sendSimpleFlowData(0);
+            lastValveClosed = valveClosed;
+            LastStatusMonitor = statusMonitor;
+            sendSimpleFlowData(warningAlert);
+            warningAlert = 0;
         }
     }
 }
@@ -456,7 +461,7 @@ void loadVolumeFromPrefs()
     volumePrefs.end();
 
     /// update LEDS
-    setValveMode(statusMonitorTemp,false);
+    setValveMode(statusMonitorTemp);
     // statusMonitor = statusMonitorTemp;
 
     /// confirm valve status is real
@@ -494,7 +499,7 @@ void saveVolumeToPrefs()
     Serial.println("Done");
 }
 
-void setValveMode(int newMode, bool sendMqttMsg)
+void setValveMode(int newMode)
 {
     if (newMode != statusMonitor)
     {
@@ -518,10 +523,6 @@ void setValveMode(int newMode, bool sendMqttMsg)
             showPixelColorEx(0, 255, 0, 255);
         }
 
-        if(sendMqttMsg)
-        {
-            sendSimpleFlowData(0);
-        }
     }
     else
     {
