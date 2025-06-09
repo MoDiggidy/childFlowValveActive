@@ -13,40 +13,41 @@ Preferences preferences;
 
 // === CONFIGURATION ===
 
-
-#define RETRY_INTERVAL 60000UL // 1 min
+#define RETRY_INTERVAL 60000UL // How long to wait to try resending old mqtt messages miliseconds
 #define BUFFER_SIZE 24         // up to 24 hours of data
 #define CUSTOM_MQTT_KEEPALIVE 60
+
+unsigned long lastMQTTConnectAttempt = 0;
+const unsigned long mqttReconnectIntervalMS = 60000UL; // delay to try reconnecting to mqtt
+
+unsigned long lastMQTTPublishFail = 0;
+const unsigned long mqttPublishRetryDelayMS = 30000UL; // 1 minute
 
 unsigned long lastRetryTime = 0;
 unsigned long lastSend = 0;
 bool isCyclingValve = false;
 
+const char *mqtt_server = MQTT_SERVER;
 
-const char* mqtt_server = MQTT_SERVER;
-
-const char* mqtt_lwt_message = "offline";
-const char* mqtt_online_message = "online";
+const char *mqtt_lwt_message = "offline";
+const char *mqtt_online_message = "online";
 
 // Temporary Strings to build topics
 String topicBaseStr = String(TOPIC_BASE_STR);
 String mqttClientBase = String(MQTT_CLIENT_ID);
 
-String topic_fullflow_str   = topicBaseStr + mqttClientBase + "/flowData";
+String topic_fullflow_str = topicBaseStr + mqttClientBase + "/flowData";
 String topic_simpleflow_str = topicBaseStr + mqttClientBase + "/simpleFlowData";
-String topic_lwt_str        = topicBaseStr + mqttClientBase + "/status";
-String topic_command_str    = topicBaseStr + mqttClientBase + "/cmdSend";
-String topic_ack_str        = topicBaseStr + mqttClientBase + "/Ack";
+String topic_lwt_str = topicBaseStr + mqttClientBase + "/status";
+String topic_command_str = topicBaseStr + mqttClientBase + "/cmdSend";
+String topic_ack_str = topicBaseStr + mqttClientBase + "/Ack";
 
 // Final const char* pointers (converted from Strings)
-const char* mqtt_fullflow_topic   = topic_fullflow_str.c_str();
-const char* mqtt_simpleflow_topic = topic_simpleflow_str.c_str();
-const char* mqtt_lwt_topic        = topic_lwt_str.c_str();
-const char* mqtt_command_topic    = topic_command_str.c_str();
-const char* mqtt_ack_topic        = topic_ack_str.c_str();
-
-
-
+const char *mqtt_fullflow_topic = topic_fullflow_str.c_str();
+const char *mqtt_simpleflow_topic = topic_simpleflow_str.c_str();
+const char *mqtt_lwt_topic = topic_lwt_str.c_str();
+const char *mqtt_command_topic = topic_command_str.c_str();
+const char *mqtt_ack_topic = topic_ack_str.c_str();
 
 /////Decalre external variables and functions
 
@@ -60,9 +61,8 @@ extern void closeValve();
 extern void openValve();
 extern void cycleValve();
 extern void saveVolumeToPrefs();
-extern void setValveMode(int newMode,bool sendMqttMsg = true);
+extern void setValveMode(int newMode, bool sendMqttMsg = true);
 extern void connectToWiFi();
-
 
 // ==== FUNCTION DECLARATIONS ====
 void connectToMQTT();
@@ -159,63 +159,82 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
         }
     }
 }
-  //
+//
 void connectToMQTT()
 {
     unsigned long startAttempt = millis();
     const unsigned long maxDuration = 5000; // 5 seconds max
 
-    while (!mqttClient.connected())
-    {
-        Serial.print("Connecting to MQTT...");
-        mqttClient.setBufferSize(512); // or 1024 for very large messages
-        // Set username and password here
-        if (mqttClient.connect(
-                MQTT_CLIENT_ID,       // Client ID
-                MQTT_USER, MQTT_PASS, // Username and Password
-                mqtt_lwt_topic, 1, true,
-                mqtt_lwt_message)) // Last Will message
-        {
-            mqttClient.publish(mqtt_lwt_topic, mqtt_online_message, true); // Publish online status
-    mqttClient.setCallback(mqttCallback);
-    mqttClient.subscribe(mqtt_command_topic);
-            Serial.println(" connected.");
-            return;
-        }
-        else
-        {
-            Serial.print(" failed, rc=");
-            Serial.println(mqttClient.state());
-            delay(1000);
+    // If MQTT is already connected or it's too soon to retry, skip
+if (mqttClient.connected()) {
+    Serial.println("Connecting to MQTT skipped: already connected");
+    return;
+}
 
-            if (millis() - startAttempt > maxDuration)
-            {
-                Serial.println("MQTT short timeout. Giving up for now.");
-                return;
-            }
+if (lastMQTTConnectAttempt != 0 && millis() - lastMQTTConnectAttempt < mqttReconnectIntervalMS) {
+    Serial.println("Connecting to MQTT skipped: waiting for retry window.");
+    return;
+}
+
+    Serial.print("Connecting to MQTT...");
+    lastMQTTConnectAttempt = millis(); // Mark this attempt time
+
+    mqttClient.setBufferSize(512); // or 1024 for very large messages
+    if (mqttClient.connect(
+            MQTT_CLIENT_ID,       // Client ID
+            MQTT_USER, MQTT_PASS, // Username and Password
+            mqtt_lwt_topic, 1, true,
+            mqtt_lwt_message)) // Last Will message
+    {
+        mqttClient.publish(mqtt_lwt_topic, mqtt_online_message, true); // Publish online status
+        mqttClient.setCallback(mqttCallback);
+        mqttClient.subscribe(mqtt_command_topic);
+        Serial.println(" connected.");
+        return;
+    }
+    else
+    {
+        Serial.print(" failed, rc=");
+        Serial.println(mqttClient.state());
+        delay(1000);
+
+        if (millis() - startAttempt > maxDuration)
+        {
+            Serial.println("MQTT short timeout. Giving up for now.");
         }
     }
-
 }
 
 bool sendMQTTMessage(const char *payload)
 {
     connectToMQTT();
+
+    if (!mqttClient.connected())
+    {
+        Serial.println("MQTT not connected. Skipping send.");
+        return false;
+    }
+
+    // Check if we are in retry delay period after previous failure
+    if (lastMQTTPublishFail != 0 && millis() - lastMQTTPublishFail < mqttPublishRetryDelayMS)
+    {
+        Serial.println("MQTT publish throttled due to recent failure.");
+        return false;
+    }
+
     bool success = mqttClient.publish(mqtt_fullflow_topic, payload, true);
     if (success)
     {
         Serial.println("MQTT message sent successfully.");
+        return true;
     }
     else
     {
-
         Serial.print("MQTT publish failed. State: ");
-        Serial.println(mqttClient.state()); // Shows error code
-        Serial.print("Payload length: ");
-        Serial.println(strlen(payload));
-        Serial.println(payload);
+        Serial.println(mqttClient.state());
+        lastMQTTPublishFail = millis(); // Mark failed publish time
+        return false;
     }
-    return success;
 }
 
 void savePayloadToBuffer(const char *payload)
@@ -345,7 +364,7 @@ void sendFlowData(
         savePayloadToBuffer(payload);
     }
 }
- 
+
 void sendSimpleFlowData(int warning)
 {
 
@@ -378,7 +397,20 @@ void sendSimpleFlowData(int warning)
     Serial.println();
 
     connectToMQTT();
+    if (!mqttClient.connected())
+    {
+        Serial.println("Skipping SimpleFlowData send: MQTT not connected.");
+        return;
+    }
+    if (millis() - lastMQTTPublishFail < mqttPublishRetryDelayMS)
+    {
+        Serial.println("Skipping SimpleFlowData send: publish recently failed.");
+        return;
+    }
+
     bool success = mqttClient.publish(mqtt_simpleflow_topic, payload, true);
+    if (!success)
+        lastMQTTPublishFail = millis();
 
     if (success)
     {
@@ -392,10 +424,12 @@ void sendSimpleFlowData(int warning)
     }
 }
 
-void reconnectIfNeeded() {
-  if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) {
-    connectToMQTT();
-  }
+void reconnectIfNeeded()
+{
+    if (WiFi.status() == WL_CONNECTED && !mqttClient.connected())
+    {
+        connectToMQTT();
+    }
 }
 
 #endif
