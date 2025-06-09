@@ -10,6 +10,7 @@
 #define BUTTON_VALVE_PIN 33 // Button for valve toggle (valveClosed)
 
 // === Configuration Constants ===
+const unsigned int pulseDebounceMmS = 200000 ;  //debounce time for pulse meter pule count in microseconds
 const int sendFlowTimeMs = 10000;        // rate at which simpleflow data gets sent
 const int updateFlowTimeMs = 10000;      // cycle time to check pulse count on flowmeter
 const float calibrationFactor = 10.0;    // pulses per gallon
@@ -19,6 +20,8 @@ const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000 // Max cycle time in ms (e.g. 10 seconds)
 #define VALVE_CYCLE_DELAY 10000   // Time valve remains closed before reopening
+
+// === pulse tracking ===
 
 // === ButtonMode tracking ===
 unsigned long buttonModePressStart = 0;
@@ -53,6 +56,7 @@ float lastFlow10s = 0;
 unsigned long timerUpdateCheckMs = 0;
 unsigned long timerSendFlowCheckMs = 0;
 volatile unsigned long pulseCount = 0;
+volatile unsigned long lastPulseTime = 0;  //pulse timer for debounce
 int oldHour = 0;
 int oldDay = 0;
 int oldMin = 0;
@@ -83,7 +87,11 @@ void loadVolumeFromPrefs();
 // === ISR ===
 void IRAM_ATTR pulseCounter()
 {
-    pulseCount++;
+    unsigned long now = micros();
+    if (now - lastPulseTime > pulseDebounceMmS) { 
+        pulseCount++;
+         lastPulseTime = now;
+    }
 }
 
 void flowMeterSetup()
