@@ -66,7 +66,6 @@ void loop()
   if (millis() - timerCheckMs > timerTimeMs)
   {
     timerCheckMs = millis();
-    checkWiFiReconnect();
-    reconnectIfNeeded();
+    reconnectIfNeeded();  //reconnect mqtt if needed
   }
 }

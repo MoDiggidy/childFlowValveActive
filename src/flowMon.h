@@ -339,6 +339,7 @@ void flowCalcs()
 {
     if (millis() - timerUpdateCheckMs > updateFlowTimeMs)
     {
+        checkWiFiReconnect();
         timerUpdateCheckMs = millis();
 
         long pulseCountNow = pulseCount;

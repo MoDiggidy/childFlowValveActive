@@ -15,9 +15,15 @@
 
 #define NEOPIXEL_PIN PIN_NEOPIXEL
 
-unsigned long wifiCheckMs = 0;     // establish variable to check timer loop
-unsigned long wifiTimeMs = 240000; // set wifi reconnect timer miliseconds
+unsigned long wifiCheckMs = 0;           // establish variable to check timer loop
+unsigned long wifiTimeMs = 240000;       // set wifi reconnect timer miliseconds
 unsigned long wifiConnectTimeMs = 10000; // how long to wait for wifi to connect miliseconds
+
+bool isNtpTimeConnected = false;
+
+///declare functions
+void initTime(unsigned long timeoutMillis = 10000);
+void reconnectIfNeeded(); // fully declared in espMqtt
 
 
 Adafruit_NeoPixel pixelOnboard(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -65,42 +71,50 @@ void connectToWiFi()
   // showPixelColorEx(2,255, 255, 0); // Turn green on success
 
   Serial.println("Connecting to WiFi...");
-      unsigned long startAttempt = millis();
-      while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeMs)
-      {
-        delay(500);
-        Serial.print(".");
-      }
-      Serial.println();
+  unsigned long startAttempt = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeMs)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
 
-      if (WiFi.status() == WL_CONNECTED)
-      {
-        showPixelColorOnboard(0, 255, 0); // Turn green on success
-        showPixelColorEx(2, 0, 255, 0); // Turn green on success
-        Serial.println("WiFi Connected!");
-        Serial.print("IP Address: ");
-        Serial.println(WiFi.localIP());
-        Serial.print("MAC Address: ");
-        Serial.println(WiFi.macAddress());
-        Serial.print("WiFi Channel: ");
-        Serial.println(WiFi.channel());
-        Serial.print("WiFi Signal Strength:");
-        Serial.println(WiFi.RSSI());
-      }
-      else
-      {
-        Serial.println("Failed to connect to WiFi.");
-        showPixelColorOnboard(255, 0, 0); // Red
-        showPixelColorEx(2, 255, 0, 0);
-      }
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    showPixelColorOnboard(0, 255, 0); // Turn green on success
+    showPixelColorEx(2, 0, 255, 0);   // Turn green on success
+    Serial.println("WiFi Connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("MAC Address: ");
+    Serial.println(WiFi.macAddress());
+    Serial.print("WiFi Channel: ");
+    Serial.println(WiFi.channel());
+    Serial.print("WiFi Signal Strength:");
+    Serial.println(WiFi.RSSI());
+  }
+  else
+  {
+    Serial.println("Failed to connect to WiFi.");
+    showPixelColorOnboard(255, 0, 0); // Red
+    showPixelColorEx(2, 255, 0, 0);
+  }
+}
 
+bool isWifiDisconnected()
+{
+  return WiFi.status() != WL_CONNECTED;
+}
 
+bool isWifiConnected()
+{
+  return WiFi.status() == WL_CONNECTED;
 }
 
 void checkWiFiReconnect()
 {
 
-  if (WiFi.status() != WL_CONNECTED)
+  if (!isWifiConnected())
   {
     if (millis() - wifiCheckMs > wifiTimeMs)
     {
@@ -126,10 +140,13 @@ void checkWiFiReconnect()
         Serial.println("WiFi reconnected.");
         showPixelColorOnboard(0, 255, 0); // Green
         showPixelColorEx(2, 0, 255, 0);
+        initTime(); // restart time sync
+        reconnectIfNeeded(); // reconnect mqtt if needed
       }
       else
       {
         Serial.println("Reconnection failed.");
+        isNtpTimeConnected = false;
         showPixelColorOnboard(255, 0, 0); // Red
         showPixelColorEx(2, 255, 0, 0);
       }
@@ -137,6 +154,7 @@ void checkWiFiReconnect()
     else
     {
       Serial.println("Wifi not connected.  Waiting to reconnect");
+      isNtpTimeConnected = false;
     }
   }
 }
@@ -149,11 +167,12 @@ const char *ntpServer = "pool.ntp.org";
 // PST8PDT: Pacific Standard Time with DST starting 2nd Sunday in March, ending 1st Sunday in November
 const char *timeZone = "PST8PDT,M3.2.0/2,M11.1.0/2";
 
-void initTime(unsigned long timeoutMillis = 10000)
+void initTime(unsigned long timeoutMillis)
 {
-  if (WiFi.status() != WL_CONNECTED)
+  if (!isWifiConnected())
   {
     Serial.println("NTP sync skipped: WiFi not connected.");
+    isNtpTimeConnected = false;
     return;
   }
 
@@ -168,6 +187,7 @@ void initTime(unsigned long timeoutMillis = 10000)
     if (millis() - startAttempt > timeoutMillis)
     {
       Serial.println("Failed to sync time: timeout.");
+      isNtpTimeConnected = false;
       return;
     }
     delay(500);
@@ -175,19 +195,29 @@ void initTime(unsigned long timeoutMillis = 10000)
   }
 
   Serial.println("\nTime synchronized!");
+  isNtpTimeConnected = true;
 }
 
 void updateTime()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+  {
+    Serial.println("Failed to obtain time, wifi or ntp not connected");
+    isNtpTimeConnected = false;
+    return;
+  }
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo))
   {
     Serial.println("Failed to obtain time");
+    isNtpTimeConnected = false;
   }
 }
 
 int getMonth()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_mon + 1;
@@ -196,6 +226,8 @@ int getMonth()
 
 int getDay()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_mday;
@@ -204,6 +236,8 @@ int getDay()
 
 int getHour()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_hour;
@@ -212,6 +246,8 @@ int getHour()
 
 int getMinute()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_min;
@@ -220,6 +256,8 @@ int getMinute()
 
 int getSecond()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_sec;
@@ -227,6 +265,8 @@ int getSecond()
 }
 int getYear()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
     return timeinfo.tm_year + 1900;
@@ -235,6 +275,8 @@ int getYear()
 
 String getDateTime()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return String("0000-00-00 00:00:00");
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
@@ -242,11 +284,13 @@ String getDateTime()
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
     return String(buffer);
   }
-  return "Invalid";
+  return String("0000-00-00 00:00:00");
 }
 
 String getDate()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return String("0000-00-00");
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
@@ -254,11 +298,13 @@ String getDate()
     strftime(buffer, sizeof(buffer), "%Y-%m-%d", &timeinfo);
     return String(buffer);
   }
-  return "Invalid";
+  return String("0000-00-00");
 }
 
 String getTime()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return String("00:00:00");
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
@@ -266,11 +312,13 @@ String getTime()
     strftime(buffer, sizeof(buffer), "%H:%M:%S", &timeinfo);
     return String(buffer);
   }
-  return "Invalid";
+  return String("00:00:00");
 }
 
 int getMinutesToday()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return -1;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
@@ -281,6 +329,9 @@ int getMinutesToday()
 
 String getDateTimeMin()
 {
+  if (!isWifiConnected() || !isNtpTimeConnected)
+    return String("1970-01-01T00:00");
+  ;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo))
   {
@@ -290,7 +341,7 @@ String getDateTimeMin()
   }
 
   // Return a fallback timestamp or local milliseconds
-  return String("1970-01-01T00:00");  // or String(millis()) for uniqueness
+  return String("1970-01-01T00:00"); // or String(millis()) for uniqueness
 }
 
 #endif
