@@ -160,11 +160,6 @@ void updateVolumes(int index) {
     updateMax(&max30Min, &max30MinTime, 1800 / (updateFlowTimeMs / 1000), index);
 }
 
-void sendflow(String oldTimeStamp, int volumeSend) {
-    sendFlowData(max10Sec, max1Min, max10Min, volumeSend,
-                 max10SecTime, max1MinTime, max10MinTime,
-                 oldTimeStamp, valveClosed, statusMonitor);
-}
 
 void calculateFlowStats(float volumeNowgal) {
     flowSamples[sampleIndex] = flowAvg[flowAvgIndex] = volumeNowgal * galPerMinFactor;
@@ -212,7 +207,7 @@ void handleTimedEvents() {
     }
 
     if (oldHour != getTimeInt("Hour")) {
-        sendflow(oldTimeStamp, volumeHour);
+        sendFlowData(volumeHour,oldTimeStamp);
         oldTimeStamp = getTimeString("DateTimeMin");
         volumeHour = 0;
         oldHour = getTimeInt("Hour");

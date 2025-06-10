@@ -48,7 +48,7 @@ void loop()
   checkButtonMode();
   checkButtonValve();
 
-  if (WiFi.status() == WL_CONNECTED && mqttClient.connected())
+  if (isWifiConnected() && mqttClient.connected())
   {
     mqttClient.loop(); //keep mqtt alive
   }

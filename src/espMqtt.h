@@ -46,27 +46,16 @@ const char *mqtt_command_topic   = topic_command_str.c_str();
 const char *mqtt_ack_topic       = topic_ack_str.c_str();
 
 // === Externs ===
-extern float flow10s, flowAvgValue;
+extern String max1MinTime, max10SecTime, max10MinTime, max30MinTime;
+extern float flow10s, flowAvgValue,max1Min, max10Sec, max10Min, max30Min;
 extern bool valveClosed;
 extern unsigned long waterRunDurSec;
 extern int statusMonitor;
-extern void closeValve(), openValve(), cycleValve(), saveVolumeToPrefs();
-extern void setValveMode(int);
-extern void connectToWiFi();
-extern String getTimeString(String key);
+extern void closeValve(), openValve(), cycleValve(), setValveMode(int), saveVolumeToPrefs();
 
 // === Function Declarations ===
-void connectToMQTT();
-bool sendMQTTMessage(const char *payload);
-void savePayloadToBuffer(const char *payload);
-bool loadPayloadFromBuffer(int index, String &payloadOut);
-void clearPayloadFromBuffer(int index);
 int getIndex(const char *key);
 void setIndex(const char *key, int value);
-void retryUnsentPayloads();
-void sendFlowData(float, float, float, float, String, String, String, String, int, int);
-void sendSimpleFlowData(int warning);
-void reconnectIfNeeded();
 
 // === Acknowledgement Send ===
 void sendAck(const char *cmd, const char *status) {
@@ -123,7 +112,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
 // === MQTT Connect ===
 void connectToMQTT() {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!isWifiConnected()) {
         Serial.println("MQTT skipped: WiFi not connected");
         return;
     }
@@ -249,21 +238,23 @@ void retryUnsentPayloads() {
     }
 }
 
+
+
+
 // === Flow Data Publishing ===
-void sendFlowData(float max10s_fl, float max1m_fl, float max10m_fl, float total_fl,
-                  String max10sTimeStamp, String max1mTimeStamp, String max10mTimeStamp,
-                  String timeStamp, int valveStatusDom, int valveModeDom) {
+void sendFlowData(float volumeTotalSend,
+                  String timeStamp) {
     StaticJsonDocument<512> doc;
-    doc["max10s_fl"] = max10s_fl;
-    doc["max1m_fl"] = max1m_fl;
-    doc["max10m_fl"] = max10m_fl;
-    doc["total_fl"] = total_fl;
-    doc["max10sTimeStamp"] = max10sTimeStamp;
-    doc["max1mTimeStamp"] = max1mTimeStamp;
-    doc["max10mTimeStamp"] = max10mTimeStamp;
+    doc["max10s_fl"] = max10Sec;
+    doc["max1m_fl"] = max1Min;
+    doc["max10m_fl"] = max10Min;
+    doc["total_fl"] = volumeTotalSend;
+    doc["max10sTimeStamp"] = max10SecTime;
+    doc["max1mTimeStamp"] = max1MinTime;
+    doc["max10mTimeStamp"] = max10MinTime;
     doc["timeStamp"] = timeStamp;
-    doc["valveStatusDom"] = valveStatusDom;
-    doc["valveModeDom"] = valveModeDom;
+    doc["valveStatusDom"] = valveClosed;
+    doc["valveModeDom"] = statusMonitor;
 
     char payload[512];
     if (serializeJson(doc, payload, sizeof(payload)) == 0) {
@@ -282,7 +273,7 @@ void sendFlowData(float max10s_fl, float max1m_fl, float max10m_fl, float total_
 
 // === Simple Flow Data ===
 void sendSimpleFlowData(int warning) {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!isWifiConnected()) {
         Serial.println("SimpleFlow skipped: no WiFi.");
         return;
     }
@@ -322,7 +313,7 @@ void sendSimpleFlowData(int warning) {
 
 // === MQTT Auto Reconnect ===
 void reconnectIfNeeded() {
-    if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) {
+    if (isWifiConnected() && !mqttClient.connected()) {
         connectToMQTT();
     }
 }

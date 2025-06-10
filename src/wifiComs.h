@@ -87,7 +87,7 @@ void connectToWiFi() {
 
   Serial.println("Connecting to WiFi...");
   unsigned long startAttempt = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeoutMS) {
+  while (!isWifiConnected() && millis() - startAttempt < wifiConnectTimeoutMS) {
     delay(500);
     Serial.print(".");
   }
@@ -127,7 +127,7 @@ void checkWiFiReconnect() {
   WiFi.begin(SECRET_SSID, SECRET_PASS);
 
   unsigned long startAttempt = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiConnectTimeoutMS) {
+  while (!isWifiConnected() && millis() - startAttempt < wifiConnectTimeoutMS) {
     delay(500);
     Serial.print(".");
   }
