@@ -47,7 +47,7 @@ const char *mqtt_ack_topic       = topic_ack_str.c_str();
 
 // === Externs ===
 extern String max1MinTime, max10SecTime, max10MinTime, max30MinTime;
-extern float flow10s, flowAvgValue,max1Min, max10Sec, max10Min, max30Min;
+extern float flow10s, flowAvgValue,max1Min, max10Sec, max10Min, max30Min, volumeAll;
 extern bool valveClosed;
 extern unsigned long waterRunDurSec;
 extern int statusMonitor;
@@ -242,13 +242,14 @@ void retryUnsentPayloads() {
 
 
 // === Flow Data Publishing ===
-void sendFlowData(float volumeTotalSend,
+void sendBigData(float volumeTotalSend,
                   String timeStamp) {
     StaticJsonDocument<512> doc;
     doc["max10s_fl"] = max10Sec;
     doc["max1m_fl"] = max1Min;
     doc["max10m_fl"] = max10Min;
     doc["total_fl"] = volumeTotalSend;
+    doc["volAll"] = volumeAll;
     doc["max10sTimeStamp"] = max10SecTime;
     doc["max1mTimeStamp"] = max1MinTime;
     doc["max10mTimeStamp"] = max10MinTime;
@@ -272,7 +273,7 @@ void sendFlowData(float volumeTotalSend,
 }
 
 // === Simple Flow Data ===
-void sendSimpleFlowData(int warning) {
+void sendSimpleData(int warning) {
     if (!isWifiConnected()) {
         Serial.println("SimpleFlow skipped: no WiFi.");
         return;
@@ -284,6 +285,7 @@ void sendSimpleFlowData(int warning) {
     doc["valveClosed"] = valveClosed;
     doc["runTime"] = waterRunDurSec;
     doc["valveMode"] = statusMonitor;
+    doc["volAll"] = volumeAll;
     doc["warning"] = warning;
     doc["timeStamp"] = getTimeString("DateTimeMin");
 

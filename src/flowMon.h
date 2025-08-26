@@ -14,9 +14,10 @@
 const unsigned int pulseDebounceUs = 200000;
 const int sendFlowTimeMs = 10000;
 const int updateFlowTimeMs = 10000;
-const float calibrationFactor = 10.0;
+const float calibrationFactor = 10.0; ////pulse/Gal
 const unsigned long waterRunMinSec = 15;
-const int waterRunMaxSec[3] = {0, 60, 30};
+/// @brief {manual, Home, Away}
+const int waterRunMaxSec[3] = {0, 600, 300};
 const int maxIntervals = 3600 / (updateFlowTimeMs / 1000);
 const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 #define VALVE_CYCLE_TIMEOUT 40000
@@ -50,7 +51,7 @@ float max1Min = 0, max10Sec = 0, max10Min = 0, max30Min = 0;
 String max1MinTime = "", max10SecTime = "", max10MinTime = "", max30MinTime = "";
 
 // === Volume Tracking ===
-float volumeHour = 0.0, volumeMin = 0.0, volumeDay = 0.0;
+float volumeHour = 0.0, volumeMin = 0.0, volumeDay = 0.0, volumeAll = 0.0;
 bool volumeNeedsSave = false;
 unsigned long lastVolumeSave = 0;
 const unsigned long volumeSaveInterval = 60000;
@@ -183,6 +184,7 @@ void updateWaterState(long pulses, float volumeNowgal) {
         volumeHour += volumeNowgal;
         volumeDay += volumeNowgal;
         volumeMin += volumeNowgal;
+        volumeAll +=  volumeNowgal;
         volumeNeedsSave = true;
     } else {
         if (waterStopDurSec >= waterRunMinSec) {
@@ -207,7 +209,7 @@ void handleTimedEvents() {
     }
 
     if (oldHour != getTimeInt("Hour")) {
-        sendFlowData(volumeHour,oldTimeStamp);
+        sendBigData(volumeHour,oldTimeStamp);
         oldTimeStamp = getTimeString("DateTimeMin");
         volumeHour = 0;
         oldHour = getTimeInt("Hour");
@@ -232,7 +234,7 @@ void handleTimedEvents() {
             lastWaterRunDurSec = waterRunDurSec;
             lastValveClosed = valveClosed;
             LastStatusMonitor = statusMonitor;
-            sendSimpleFlowData(warningAlert);
+            sendSimpleData(warningAlert);
             warningAlert = 0;
         }
     }
@@ -240,8 +242,8 @@ void handleTimedEvents() {
 
 void logFlowStatus(long pulseCountNow, float volumeNowgal) {
     Serial.printf("\nPulse Count: %ld\n", pulseCountNow);
-    Serial.printf("Flow10s: %.2f GPM | FlowAvg: %.2f GPM | VolumeHour: %.2f gal\n",
-                  flow10s, flowAvgValue, volumeHour);
+    Serial.printf("Flow10s: %.2f GPM | FlowAvg: %.2f GPM | VolumeHour: %.2f gal | VolumeAll: %.2f gal\n",
+                  flow10s, flowAvgValue, volumeHour, volumeAll);
     Serial.printf("Running: %d | Time Run: %lu s | Stop: %lu s | ValveClosed: %d\n",
                   waterRun, waterRunDurSec, waterStopDurSec, valveClosed);
 }
@@ -317,6 +319,7 @@ void loadVolumeFromPrefs() {
     volumeHour = volumePrefs.getFloat("volHour", 0.0);
     volumeMin = volumePrefs.getFloat("volMin", 0.0);
     volumeDay = volumePrefs.getFloat("volDay", 0.0);
+    volumeAll = volumePrefs.getFloat("volAll", 0.0);
     oldHour = volumePrefs.getInt("oldHour", 0);
     oldDay = volumePrefs.getInt("oldDay", 0);
     oldTimeStamp = volumePrefs.getString("oldTimeStamp", "");
@@ -334,6 +337,7 @@ void saveVolumeToPrefs() {
     volumePrefs.putFloat("volHour", volumeHour);
     volumePrefs.putFloat("volMin", volumeMin);
     volumePrefs.putFloat("volDay", volumeDay);
+    volumePrefs.putFloat("volAll", volumeAll);
     volumePrefs.putInt("oldHour", oldHour);
     volumePrefs.putInt("oldDay", oldDay);
     volumePrefs.putString("oldTimeStamp", oldTimeStamp);
