@@ -45,6 +45,27 @@ const char *mqtt_lwt_topic       = topic_lwt_str.c_str();
 const char *mqtt_command_topic   = topic_command_str.c_str();
 const char *mqtt_ack_topic       = topic_ack_str.c_str();
 
+// === Warning Topics ===
+String topic_warning_str      = "6556/warnings";
+String topic_warning_ack_str  = "6556/warnings/ack";
+const char *mqtt_warning_topic     = topic_warning_str.c_str();
+const char *mqtt_warning_ack_topic = topic_warning_ack_str.c_str();
+
+// === Warning ACK State ===
+String pendingWarnID = "";
+String pendingWarnPayload = "";
+unsigned long pendingWarnSentAt = 0;
+int pendingWarnRetries = 0;
+
+const unsigned long WARN_ACK_TIMEOUT_MS = 15000UL; // 15s
+const int WARN_MAX_RETRIES = 3;
+
+// === Forward Decls ===
+bool sendWarning(const char *wLevel, const char *wMessage, const char *wTitle);
+void processWarningAckTick();
+void handleWarningAck(const String &msg);
+
+
 // === Externs ===
 extern String max1MinTime, max10SecTime, max10MinTime, max30MinTime;
 extern float flow10s, flowAvgValue,max1Min, max10Sec, max10Min, max30Min, volumeAll;
@@ -56,6 +77,8 @@ extern void closeValve(), openValve(), cycleValve(), setValveMode(int), saveVolu
 // === Function Declarations ===
 int getIndex(const char *key);
 void setIndex(const char *key, int value);
+
+
 
 // === Acknowledgement Send ===
 void sendAck(const char *cmd, const char *status) {
@@ -75,6 +98,13 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
     String msg;
     for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
     Serial.printf("Message received on topic %s: %s\n", topic, msg.c_str());
+
+    // Handle warning ACKs
+    if (String(topic) == mqtt_warning_ack_topic) {
+        handleWarningAck(msg);
+        return;
+    }
+
 
     if (String(topic) != mqtt_command_topic) return;
 
@@ -135,6 +165,7 @@ void connectToMQTT() {
         mqttClient.publish(mqtt_lwt_topic, mqtt_online_message, true);
         mqttClient.setCallback(mqttCallback);
         mqttClient.subscribe(mqtt_command_topic);
+        mqttClient.subscribe(mqtt_warning_ack_topic);
         Serial.println(" connected.");
     } else {
         Serial.print(" failed, rc=");
@@ -319,5 +350,119 @@ void reconnectIfNeeded() {
         connectToMQTT();
     }
 }
+
+// Build a unique ID using client id + random + time
+static String buildWarningID() {
+    char rnd[9];
+    snprintf(rnd, sizeof(rnd), "%08lx", (unsigned long)esp_random());
+    return String(MQTT_CLIENT_ID) + "-" + String(rnd) + "-" + getTimeString("DateTimeMin");
+}
+
+// One-shot publish; sets pending state for retry-on-no-ACK
+bool sendWarning(const char *wLevel, const char *wMessage, const char *wTitle) {
+    connectToMQTT();
+    if (!mqttClient.connected()) {
+        Serial.println("[WARN] MQTT not connected; cannot send warning.");
+        return false;
+    }
+
+    // if a previous warning still pending, don't overwrite—retry loop will handle it
+    if (pendingWarnID.length() > 0) {
+        Serial.println("[WARN] Previous warning still awaiting ACK; skipping new send.");
+        return false;
+    }
+
+    String wID = buildWarningID();
+
+    StaticJsonDocument<384> doc;
+    doc["wLevel"] = wLevel;        // e.g. "info", "warn", "crit"
+    doc["wMessage"] = wMessage;    // human-readable description
+    doc["wTitle"] = wTitle;        // short title
+    doc["wID"] = wID;              // unique id to match ACK
+    doc["client"] = MQTT_CLIENT_ID;
+    doc["timeStamp"] = getTimeString("DateTimeMin");
+
+    char payload[384];
+    if (serializeJson(doc, payload, sizeof(payload)) == 0) {
+        Serial.println("[WARN] Warning JSON serialization failed.");
+        return false;
+    }
+
+    bool ok = mqttClient.publish(mqtt_warning_topic, payload, false);
+    if (!ok) {
+        Serial.print("[WARN] Publish failed. State: ");
+        Serial.println(mqttClient.state());
+        return false;
+    }
+
+    // Track pending for ACK
+    pendingWarnID = wID;
+    pendingWarnPayload = payload;
+    pendingWarnSentAt = millis();
+    pendingWarnRetries = 0;
+
+    Serial.printf("[WARN] Warning sent (wID=%s). Awaiting ACK...\n", pendingWarnID.c_str());
+    return true;
+}
+
+// Call this frequently (e.g., from your main loop) to enforce the ACK timeout & retry
+void processWarningAckTick() {
+    if (pendingWarnID.length() == 0) return; // nothing pending
+
+    unsigned long elapsed = millis() - pendingWarnSentAt;
+    if (elapsed < WARN_ACK_TIMEOUT_MS) return;
+
+    if (!mqttClient.connected()) connectToMQTT();
+
+    if (pendingWarnRetries >= WARN_MAX_RETRIES) {
+        Serial.printf("[WARN] No ACK after %d retries (wID=%s). Giving up.\n",
+                      WARN_MAX_RETRIES, pendingWarnID.c_str());
+        // Clear pending so future warnings can proceed
+        pendingWarnID = "";
+        pendingWarnPayload = "";
+        pendingWarnRetries = 0;
+        return;
+    }
+
+    // Retry
+    bool ok = mqttClient.publish(mqtt_warning_topic, pendingWarnPayload.c_str(), false);
+    pendingWarnRetries++;
+    pendingWarnSentAt = millis();
+    Serial.printf("[WARN] Retrying warning send (attempt %d of %d) wID=%s ok=%d\n",
+                  pendingWarnRetries, WARN_MAX_RETRIES, pendingWarnID.c_str(), ok);
+}
+
+// Process an ACK message from Node-RED (or other consumer)
+void handleWarningAck(const String &msg) {
+    StaticJsonDocument<256> ack;
+    if (deserializeJson(ack, msg)) {
+        Serial.println("[WARN] Failed to parse warning ACK JSON.");
+        return;
+    }
+
+    const char *ackID = ack["wID"] | "";
+    const char *status = ack["status"] | "unknown";
+    const char *receiver = ack["receiver"] | "n/a";
+
+    if (pendingWarnID.length() == 0) {
+        Serial.println("[WARN] Received ACK but no warning was pending.");
+        return;
+    }
+
+    if (pendingWarnID != String(ackID)) {
+        Serial.printf("[WARN] ACK wID mismatch (expected %s, got %s). Ignoring.\n",
+                      pendingWarnID.c_str(), ackID);
+        return;
+    }
+
+    Serial.printf("[WARN] ACK received for wID=%s status=%s receiver=%s\n",
+                  ackID, status, receiver);
+
+    // Clear pending now that we've confirmed delivery
+    pendingWarnID = "";
+    pendingWarnPayload = "";
+    pendingWarnRetries = 0;
+}
+
 
 #endif

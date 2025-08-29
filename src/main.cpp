@@ -51,6 +51,8 @@ void loop()
   if (isWifiConnected() && mqttClient.connected())
   {
     mqttClient.loop(); //keep mqtt alive
+    processWarningAckTick();  //process ack on warnings
+
   }
   flowCalcs(); // run flow check
 

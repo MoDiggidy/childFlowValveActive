@@ -30,7 +30,7 @@ bool isNtpTimeConnected = false;
 #define NEOPIXEL_COUNT     3   //how many neopixels in sequence   
 
 //wifi
-const unsigned long wifiReconnectIntervalMS = 240000; // how long to wait until trying to reconnect wifi
+const unsigned long wifiReconnectIntervalMS = 60000; // how long to wait until trying to reconnect wifi
 const unsigned long wifiConnectTimeoutMS = 10000;     // how lon to wait for wifi to connect
 
 //NTP time server 

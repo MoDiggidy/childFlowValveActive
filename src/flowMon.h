@@ -37,6 +37,9 @@ float flowAvg[6] = {0};
 float flow10s = 0, lastFlow10s = 0;
 float flowAvgValue = 0, lastFlowAvgValue = 0;
 int sampleIndex = 0, flowAvgIndex = 0;
+// Warn once per sustained-run event
+bool warnActive = false;
+
 
 // === Time Tracking ===
 unsigned long waterRunDurSec = 0, lastWaterRunDurSec = 0, waterStopDurSec = 0;
@@ -190,6 +193,8 @@ void updateWaterState(long pulses, float volumeNowgal) {
         if (waterStopDurSec >= waterRunMinSec) {
             waterRunDurSec = 0;
             waterRun = false;
+            warnActive = false;
+
         }
         waterStopDurSec += deltaSec;
     }
@@ -197,9 +202,31 @@ void updateWaterState(long pulses, float volumeNowgal) {
 
 void handleValveLogic() {
     if (statusMonitor < 0 || statusMonitor > 2) statusMonitor = 1;
-    if (!valveClosed && statusMonitor != 0 && waterRunDurSec > waterRunMaxSec[statusMonitor])
-        closeValve();
+
+    // Only trigger when NOT manual, valve is open, and run duration exceeded limit
+    if (!valveClosed && statusMonitor != 0 && waterRunDurSec > (unsigned long)waterRunMaxSec[statusMonitor]) {
+        // Fire once per event
+        if (!warnActive) {
+            closeValve();  // sets valveClosed=true and warningAlert=1
+
+            String msgTemp;
+            msgTemp  = "Sustained Flow on Domestic Line of more than ";
+            msgTemp += waterRunMaxSec[statusMonitor];
+            msgTemp += " Seconds";
+
+            // Level 1 = warning; adjust as you like ("info","warn","crit")
+            sendWarning("1", msgTemp.c_str(), "Domestic Shutoff");
+            warnActive = true;
+        }
+    } else {
+        // If condition no longer true (e.g., manual mode, valve closed, or timer reset),
+        // allow future warnings.
+        if (!waterRun || valveClosed == true || statusMonitor == 0) {
+            warnActive = false;
+        }
+    }
 }
+
 
 void handleTimedEvents() {
     if (oldMin != getTimeInt("Minute")) {
