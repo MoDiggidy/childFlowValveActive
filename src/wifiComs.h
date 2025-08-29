@@ -77,36 +77,77 @@ unsigned long wifiCheckMs = 0;
 
 bool isWifiConnected()   { return WiFi.status() == WL_CONNECTED; }
 bool isWifiDisconnected(){ return !isWifiConnected(); }
+// Event-driven WiFi readiness
+volatile bool wifiStaConnected = false;
+volatile bool wifiGotIP = false;
+
+inline bool isWifiReady() {
+  return WiFi.status() == WL_CONNECTED && wifiStaConnected && wifiGotIP && WiFi.isConnected();
+}
+
 
 // ==========================
 // === WiFi Connection ======
 // ==========================
 void connectToWiFi() {
+  // Safer reconnect behavior on ESP32
+  WiFi.persistent(false);
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
   WiFi.mode(WIFI_STA);
+
+  // Event hooks (works on current cores; compiles on older too)
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info){
+    if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED || event == SYSTEM_EVENT_STA_CONNECTED) {
+      wifiStaConnected = true;
+      Serial.println("WiFi STA connected.");
+    }
+    if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP || event == SYSTEM_EVENT_STA_GOT_IP) {
+      wifiGotIP = true;
+      Serial.print("WiFi got IP: "); Serial.println(WiFi.localIP());
+      // Sync time & (re)connect MQTT once we truly have network
+      initTime();
+      reconnectIfNeeded();
+    }
+    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED || event == SYSTEM_EVENT_STA_DISCONNECTED) {
+      wifiStaConnected = false;
+      wifiGotIP = false;
+      isNtpTimeConnected = false;
+      Serial.println("WiFi STA disconnected.");
+      // Optional: force-drop MQTT so it won’t look "connected" while WiFi is down
+      // (mqttClient is defined in espMqtt.h)
+      // extern PubSubClient mqttClient;
+      // if (mqttClient.connected()) mqttClient.disconnect();
+    }
+  });
+
   WiFi.begin(SECRET_SSID, SECRET_PASS);
 
-  Serial.println("Connecting to WiFi...");
+  Serial.println("Connecting to WiFi.");
   unsigned long startAttempt = millis();
-  while (!isWifiConnected() && millis() - startAttempt < wifiConnectTimeoutMS) {
+  while (!isWifiReady() && millis() - startAttempt < wifiConnectTimeoutMS) {
     delay(500);
     Serial.print(".");
   }
   Serial.println();
 
-  if (isWifiConnected()) {
-    showPixelColorOnboard(0, 255, 0);   // Green
-    showPixelColorEx(2, 0, 255, 0);     // Green
+  if (isWifiReady()) {
+    showPixelColorOnboard(0, 255, 0);
+    showPixelColorEx(2, 0, 255, 0);
     Serial.println("WiFi Connected!");
     Serial.print("IP: "); Serial.println(WiFi.localIP());
     Serial.print("MAC: "); Serial.println(WiFi.macAddress());
     Serial.print("Channel: "); Serial.println(WiFi.channel());
     Serial.print("RSSI: "); Serial.println(WiFi.RSSI());
+    // ensure NTP at boot too (in case event fired before we attached)
+    initTime();
   } else {
     Serial.println("WiFi connection failed.");
-    showPixelColorOnboard(255, 0, 0);   // Red
+    showPixelColorOnboard(255, 0, 0);
     showPixelColorEx(2, 255, 0, 0);
   }
 }
+
 
 void checkWiFiReconnect() {
   if (isWifiConnected()) return;

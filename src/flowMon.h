@@ -25,7 +25,7 @@ const float galPerMinFactor = 60.0 / (updateFlowTimeMs / 1000);
 
 // === State Variables ===
 bool valveClosed = false;
-int statusMonitor = 3; // 0: manual, 1: home, 2: away
+int statusMonitor = 1; // 0: manual, 1: home, 2: away
 
 // === Flow Tracking ===
 volatile unsigned long pulseCount = 0;
@@ -280,8 +280,11 @@ void flowCalcs() {
         checkWiFiReconnect();
         timerUpdateCheckMs = millis();
 
-        long pulseNow = pulseCount;
+        noInterrupts();
+        unsigned long pulseNow = pulseCount;
         pulseCount = 0;
+        interrupts();
+
         float volNowGal = pulseNow / calibrationFactor;
         flow10s = volNowGal * galPerMinFactor;
 

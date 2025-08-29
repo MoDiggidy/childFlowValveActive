@@ -15,30 +15,23 @@ unsigned long timerCheckMs;        // establish variable to check timer loop
 unsigned long timerTimeMs = 10000; // set timer loop  to 15 seconds
 #define WDT_TIMEOUT 300            //  watchdog loop timer seconds
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   delay(3000);
-  // Start watchdog
   esp_task_wdt_init(WDT_TIMEOUT, true);
   esp_task_wdt_add(NULL);
 
   startNeoPixel();
   flowMeterSetup();
+  valveRelaySetup();
 
-  connectToWiFi();
-  // initESPNow();
-
-  // Initialize NTP client and force sync
-  initTime();
-
-  /// mqtt setup
+  connectToWiFi();                 // events will trigger NTP + MQTT
   mqttClient.setServer(mqtt_server, 1883);
   mqttClient.setKeepAlive(CUSTOM_MQTT_KEEPALIVE);
-  connectToMQTT();
-
-  valveRelaySetup();
+  // connectToMQTT();              // <-- remove; event will handle it
+  // initTime();                   // <-- remove; event will handle it
 }
+
 
 void loop()
 {
@@ -48,12 +41,9 @@ void loop()
   checkButtonMode();
   checkButtonValve();
 
-  if (isWifiConnected() && mqttClient.connected())
-  {
-    mqttClient.loop(); //keep mqtt alive
-    processWarningAckTick();  //process ack on warnings
+  if (mqttClient.connected()) mqttClient.loop();
+  processWarningAckTick();
 
-  }
   flowCalcs(); // run flow check
 
   // mqtt failed send resends

@@ -78,6 +78,18 @@ extern void closeValve(), openValve(), cycleValve(), setValveMode(int), saveVolu
 int getIndex(const char *key);
 void setIndex(const char *key, int value);
 
+// === MQTT Adaptive Backoff ===
+unsigned long bootMillis = 0;
+
+const unsigned long MQTT_BACKOFF_MIN_MS   = 2000UL;   // 2s first retry
+const unsigned long MQTT_BACKOFF_MAX_MS   = 60000UL;  // cap at 60s (same as your throttle)
+const unsigned long MQTT_STARTUP_GRACE_MS = 120000UL; // 2 minutes of faster retries
+unsigned long mqttBackoffMs = MQTT_BACKOFF_MIN_MS;
+int mqttConsecutiveFails = 0;
+
+// Forward decl
+static unsigned long jitter(unsigned long base, uint8_t pct);
+
 
 
 // === Acknowledgement Send ===
@@ -142,37 +154,55 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 
 // === MQTT Connect ===
 void connectToMQTT() {
-    if (!isWifiConnected()) {
-        Serial.println("MQTT skipped: WiFi not connected");
-        return;
-    }
+    if (!isWifiReady()) { Serial.println("MQTT skipped: WiFi not ready"); return; }
+    if (mqttClient.connected()) { Serial.println("MQTT already connected."); return; }
 
-    if (mqttClient.connected()) {
-        Serial.println("MQTT already connected.");
-        return;
-    }
+    unsigned long now = millis();
+    if (bootMillis == 0) bootMillis = now;
 
-    if (millis() - lastMQTTConnectAttempt < mqttReconnectIntervalMS) {
+    unsigned long interval = (now - bootMillis < MQTT_STARTUP_GRACE_MS)
+                              ? mqttBackoffMs
+                              : max(mqttBackoffMs, mqttReconnectIntervalMS);
+
+    if (now - lastMQTTConnectAttempt < interval) {
         Serial.println("MQTT reconnect throttled.");
         return;
     }
 
     Serial.print("Connecting to MQTT...");
-    lastMQTTConnectAttempt = millis();
-
+    lastMQTTConnectAttempt = now;
     mqttClient.setBufferSize(512);
+
     if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS, mqtt_lwt_topic, 1, true, mqtt_lwt_message)) {
+        mqttBackoffMs = MQTT_BACKOFF_MIN_MS;
+        mqttConsecutiveFails = 0;
         mqttClient.publish(mqtt_lwt_topic, mqtt_online_message, true);
         mqttClient.setCallback(mqttCallback);
         mqttClient.subscribe(mqtt_command_topic);
         mqttClient.subscribe(mqtt_warning_ack_topic);
         Serial.println(" connected.");
     } else {
-        Serial.print(" failed, rc=");
-        Serial.println(mqttClient.state());
-        delay(1000);
+        mqttConsecutiveFails++;
+        unsigned long next = min(mqttBackoffMs * 2UL, MQTT_BACKOFF_MAX_MS);
+        mqttBackoffMs = jitter(next, 10); // ±10% jitter
+        Serial.print(" failed, rc="); Serial.print(mqttClient.state());
+        Serial.print(" ; next retry ~"); Serial.print(mqttBackoffMs); Serial.println(" ms");
+        delay(250);
     }
 }
+
+
+
+// Add small randomness so multiple devices don't slam the broker at the same instant
+static unsigned long jitter(unsigned long base, uint8_t pct) {
+    // pct = 10 means ±10%
+    long span = (long)(base * (long)pct / 100L);
+    long delta = (long)((int32_t)esp_random() % (2*span + 1)) - span; // [-span, +span]
+    long val = (long)base + delta;
+    if (val < 0) val = 0;
+    return (unsigned long)val;
+}
+
 
 // === Send MQTT Message ===
 bool sendMQTTMessage(const char *payload) {
@@ -305,10 +335,8 @@ void sendBigData(float volumeTotalSend,
 
 // === Simple Flow Data ===
 void sendSimpleData(int warning) {
-    if (!isWifiConnected()) {
-        Serial.println("SimpleFlow skipped: no WiFi.");
-        return;
-    }
+    if (!isWifiReady()) { Serial.println("SimpleFlow skipped: no WiFi."); return; }
+
 
     StaticJsonDocument<384> doc;
     doc["flow10s"] = flow10s;
@@ -318,7 +346,11 @@ void sendSimpleData(int warning) {
     doc["valveMode"] = statusMonitor;
     doc["volAll"] = volumeAll;
     doc["warning"] = warning;
-    doc["timeStamp"] = getTimeString("DateTimeMin");
+
+    String ts = getTimeString("DateTimeMin");
+    if (ts.startsWith("0000")) ts = "pending";  // or omit the field
+    doc["timeStamp"] = ts;
+
 
     char payload[384];
     if (serializeJson(doc, payload, sizeof(payload)) == 0) {
@@ -331,10 +363,15 @@ void sendSimpleData(int warning) {
     Serial.println();
 
     connectToMQTT();
-    if (!mqttClient.connected() || millis() - lastMQTTPublishFail < mqttPublishRetryDelayMS) {
+    bool inStartup = (bootMillis != 0) && (millis() - bootMillis < MQTT_STARTUP_GRACE_MS);
+
+    // During startup, only require connection (skip the publish cooldown)
+    // After startup, keep your normal cooldown guard
+    if (!mqttClient.connected() || (!inStartup && (millis() - lastMQTTPublishFail < mqttPublishRetryDelayMS))) {
         Serial.println("SimpleFlow send skipped due to connection or throttle.");
         return;
     }
+
 
     if (!mqttClient.publish(mqtt_simpleflow_topic, payload, true)) {
         Serial.println("SimpleFlow publish failed.");
@@ -346,10 +383,9 @@ void sendSimpleData(int warning) {
 
 // === MQTT Auto Reconnect ===
 void reconnectIfNeeded() {
-    if (isWifiConnected() && !mqttClient.connected()) {
-        connectToMQTT();
-    }
+    if (isWifiReady() && !mqttClient.connected()) connectToMQTT();
 }
+
 
 // Build a unique ID using client id + random + time
 static String buildWarningID() {
